@@ -36,13 +36,13 @@ class GameController:
         pygame.display.set_caption("Duel of Labyrinth")
         self.clock = pygame.time.Clock()
 
-        # Modern Fonts
-        self.title_font = pygame.font.SysFont('Arial', 64, bold=True)
-        self.heading_font = pygame.font.SysFont('Arial', 32, bold=True)
-        self.large_font = pygame.font.SysFont('Arial', 24)
-        self.medium_font = pygame.font.SysFont('Arial', 18)
-        self.font = pygame.font.SysFont('Consolas', 16) # Keep Consolas for data/grid
-        self.small_font = pygame.font.SysFont('Arial', 14)
+        # Modern Fonts (Using default for Web compatibility)
+        self.title_font = pygame.font.Font(None, 80)
+        self.heading_font = pygame.font.Font(None, 48)
+        self.large_font = pygame.font.Font(None, 36)
+        self.medium_font = pygame.font.Font(None, 28)
+        self.font = pygame.font.Font(None, 24) 
+        self.small_font = pygame.font.Font(None, 20)
 
         self.state = MENU
         self.level = "MEDIUM"
