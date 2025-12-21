@@ -33,7 +33,7 @@ class GameController:
     def __init__(self):
         pygame.init()
         self.screen = pygame.display.set_mode((1000, 720), pygame.RESIZABLE)
-        pygame.display.set_caption("Maze Runner • Greedy Best-First Search")
+        pygame.display.set_caption("Duel of Labyrinth • Greedy Best-First Search")
         self.clock = pygame.time.Clock()
 
         # Modern Fonts
@@ -161,7 +161,7 @@ class GameController:
         self.screen.fill(BG_PRIMARY)
 
         # Title
-        self.draw_text("MAZE RUNNER", self.title_font, ACCENT_GREEN, (w//2, h//3))
+        self.draw_text("DUEL OF LABYRINTH", self.title_font, ACCENT_GREEN, (w//2, h//3))
         self.draw_text("Greedy Best-First Search", self.large_font, ACCENT_BLUE, (w//2, h//3 + 60))
 
         options = [
@@ -286,7 +286,7 @@ class GameController:
 
         self.draw_text(f"LEVEL: {self.level}", self.heading_font, ACCENT_BLUE, (20, bar_h//2), anchor="midleft", shadow=False)
         self.draw_text(f"TIME: {self.elapsed_time:.1f}s", self.heading_font, ACCENT_PURPLE, (w - 20, bar_h//2), anchor="midright", shadow=False)
-        self.draw_text("MAZE RUNNER", self.heading_font, TEXT_MAIN, (w//2, bar_h//2), shadow=False)
+        self.draw_text("DUEL OF LABYRINTH", self.heading_font, TEXT_MAIN, (w//2, bar_h//2), shadow=False)
 
         # Side Panel (Metrics)
         panel_w = 300
