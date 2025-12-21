@@ -30,6 +30,9 @@ class Node:
     def __hash__(self):
         return hash((self.r, self.c))
 
+    def __lt__(self, other):
+        return self.cost < other.cost
+
 
 class PerformanceMetrics:
     """Track algorithm performance for educational analysis"""
@@ -270,6 +273,60 @@ class Maze:
         
         return float('inf')  # No path exists
     
+    def bfs_analysis(self):
+        """BFS for Structural Analysis (Distance Map)"""
+        if not self.goal_node: return
+        
+        self.bfs_map = {}
+        self.max_bfs_distance = 0
+        
+        queue = deque([(self.goal_node, 0)])
+        self.bfs_map[self.goal_node] = 0
+        
+        while queue:
+            node, dist = queue.popleft()
+            self.max_bfs_distance = max(self.max_bfs_distance, dist)
+            
+            for neighbor in self.get_neighbors(node):
+                if neighbor not in self.bfs_map:
+                    self.bfs_map[neighbor] = dist + 1
+                    queue.append((neighbor, dist + 1))
+
+    def a_star_optimal(self):
+        """A* for Optimal Reference Cost"""
+        if not self.start_node or not self.goal_node: return 0
+        
+        frontier = PriorityQueue()
+        frontier.put(self.start_node, 0)
+        
+        cost_so_far = {}
+        cost_so_far[self.start_node] = 0
+        
+        while not frontier.empty():
+            current = frontier.get()
+            
+            if current == self.goal_node:
+                break
+            
+            for neighbor in self.get_neighbors(current):
+                # Calculate edge cost
+                edge_cost = 1
+                if abs(current.r - neighbor.r) + abs(current.c - neighbor.c) == 2:
+                    edge_cost = 1.414
+                
+                penalty = 0
+                if neighbor.type == 'T': penalty = 3
+                elif neighbor.type == 'P': penalty = -2
+                
+                new_cost = cost_so_far[current] + edge_cost + penalty
+                
+                if neighbor not in cost_so_far or new_cost < cost_so_far[neighbor]:
+                    cost_so_far[neighbor] = new_cost
+                    priority = new_cost + self.heuristic(neighbor)
+                    frontier.put(neighbor, priority)
+        
+        return cost_so_far.get(self.goal_node, 0)
+
     def get_total_walkable_nodes(self):
         """Count total nodes in graph (excluding walls)"""
         return sum(1 for r in range(self.height) for c in range(self.width) 
@@ -304,80 +361,160 @@ class Player:
         return False
 
 
+import heapq
+
+class PriorityQueue:
+    def __init__(self):
+        self.elements = []
+    
+    def empty(self):
+        return len(self.elements) == 0
+    
+    def put(self, item, priority):
+        heapq.heappush(self.elements, (priority, item))
+    
+    def get(self):
+        return heapq.heappop(self.elements)[1]
+
+class HuffmanNode:
+    def __init__(self, char, freq, left=None, right=None):
+        self.char = char
+        self.freq = freq
+        self.left = left
+        self.right = right
+        
+    def __lt__(self, other):
+        return self.freq < other.freq
+
+class Huffman:
+    def __init__(self):
+        self.codes = {}
+
+    def build_tree(self, text):
+        if not text: return None
+        
+        freqs = {}
+        for char in text:
+            freqs[char] = freqs.get(char, 0) + 1
+            
+        pq = []
+        for char, freq in freqs.items():
+            heapq.heappush(pq, HuffmanNode(char, freq))
+            
+        while len(pq) > 1:
+            left = heapq.heappop(pq)
+            right = heapq.heappop(pq)
+            parent = HuffmanNode(None, left.freq + right.freq, left, right)
+            heapq.heappush(pq, parent)
+            
+        root = heapq.heappop(pq)
+        self.generate_codes(root, "")
+        return root
+
+    def generate_codes(self, node, code):
+        if not node: return
+        if not node.left and not node.right:
+            self.codes[node.char] = code
+            return
+        self.generate_codes(node.left, code + "0")
+        self.generate_codes(node.right, code + "1")
+
+    def encode(self, text):
+        self.codes = {}
+        self.build_tree(text)
+        return "".join([self.codes[c] for c in text])
+    
+    def get_stats(self, text):
+        if not text: return {"original_bits": 0, "compressed_bits": 0, "ratio": 0}
+        encoded = self.encode(text)
+        original_bits = len(text) * 8
+        compressed_bits = len(encoded)
+        ratio = ((1 - compressed_bits / original_bits) * 100) if original_bits > 0 else 0
+        return {"original_bits": original_bits, "compressed_bits": compressed_bits, "ratio": round(ratio, 1)}
+
 class GreedyAI:
     """Greedy Best-First Search AI with enhanced metrics"""
-    def __init__(self, start_node):
+    def __init__(self, start_node, goal_node, maze):
         self.current_node = start_node
+        self.goal_node = goal_node
+        self.maze = maze
         self.total_cost = 0
         self.steps = 0
-        self.traps_triggered = 0
-        self.powerups_collected = 0
         self.path = [start_node]
         self.finished = False
-        self.stack = [start_node]  # For backtracking
+        self.full_path = []
+        self.path_index = 0
+        self.action_log = ""
         
         # Enhanced metrics
         self.metrics = PerformanceMetrics()
-        self.decision_history = []  # Track each decision made
-        self.current_candidates = []  # Current nodes being considered
+        self.compute_path()
         
-    def choose_move(self, maze):
-        """Make greedy decision (choose node with best heuristic)"""
-        if self.finished:
-            return
+    def heuristic(self, node):
+        # Euclidean distance
+        return math.sqrt((node.r - self.goal_node.r)**2 + (node.c - self.goal_node.c)**2)
+
+    def compute_path(self):
+        frontier = PriorityQueue()
+        frontier.put(self.current_node, 0)
         
-        neighbors = maze.get_neighbors(self.current_node)
+        came_from = {}
+        came_from[self.current_node] = None
         
-        # Filter unvisited nodes
-        candidates = [n for n in neighbors if n not in self.path]
+        current = None
         
-        # Record all candidates being evaluated
-        self.current_candidates = []
-        for node in candidates:
-            heuristic_val = maze.heuristic(node)
-            self.metrics.record_evaluation(node, heuristic_val)
-            self.current_candidates.append((node, heuristic_val))
-        
-        if candidates:
-            # GREEDY CHOICE: Pick node with minimum heuristic
-            candidates.sort(key=lambda n: maze.heuristic(n))
-            best_node = candidates[0]
-            best_heuristic = maze.heuristic(best_node)
+        while not frontier.empty():
+            current = frontier.get()
             
-            # Record decision
-            self.decision_history.append({
-                'from': self.current_node,
-                'to': best_node,
-                'heuristic': best_heuristic,
-                'alternatives': [(n, maze.heuristic(n)) for n in candidates[1:]]
-            })
+            if current == self.goal_node:
+                break
             
-            self.current_node = best_node
-            self.steps += 1
-            self.path.append(best_node)
-            self.stack.append(best_node)
-            self.metrics.record_visit(best_node)
-            
+            for neighbor in self.maze.get_neighbors(current):
+                if neighbor not in came_from:
+                    priority = self.heuristic(neighbor)
+                    frontier.put(neighbor, priority)
+                    came_from[neighbor] = current
+        
+        if current == self.goal_node:
+            path = []
+            curr = self.goal_node
+            while curr != self.current_node:
+                path.append(curr)
+                curr = came_from[curr]
+            path.reverse()
+            self.full_path = path
         else:
-            # Backtrack (graph traversal fallback)
-            self.metrics.record_dead_end()
+            print("No path found for AI")
+
+    def choose_move(self, maze):
+        if self.finished: return
+
+        if self.path_index < len(self.full_path):
+            next_node = self.full_path[self.path_index]
             
-            if len(self.stack) > 1:
-                self.metrics.record_backtrack()
-                self.stack.pop()
-                back_node = self.stack[-1]
-                
-                self.current_node = back_node
-                self.steps += 1
-                self.path.append(back_node)
-            else:
-                print("AI stuck: No valid path found")
+            # Calculate cost
+            move_cost = 1
+            if abs(self.current_node.r - next_node.r) + abs(self.current_node.c - next_node.c) == 2:
+                move_cost = 1.414
+            
+            penalty = 0
+            if next_node.type == 'T': penalty = 3
+            elif next_node.type == 'P': penalty = -2
+            
+            # Log Action
+            if penalty == 3: self.action_log += "T"
+            elif penalty == -2: self.action_log += "P"
+            else: self.action_log += "M"
+            
+            self.current_node = next_node
+            self.path.append(next_node)
+            self.steps += 1
+            self.total_cost += move_cost + penalty
+            self.path_index += 1
+            
+            if self.current_node == self.goal_node:
                 self.finished = True
     
-    def get_exploration_percentage(self, total_nodes):
-        """How much of the graph was explored"""
-        return self.metrics.get_exploration_ratio(total_nodes)
-    
-    def get_efficiency_vs_optimal(self, optimal_length):
-        """How efficient was greedy vs optimal solution"""
-        return self.metrics.get_efficiency_ratio(optimal_length)
+    def get_efficiency_vs_optimal(self, optimal_cost):
+        if self.total_cost == 0: return 0
+        return optimal_cost / self.total_cost
