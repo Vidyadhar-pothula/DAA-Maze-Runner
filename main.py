@@ -33,7 +33,7 @@ class GameController:
     def __init__(self):
         pygame.init()
         self.screen = pygame.display.set_mode((1000, 720), pygame.RESIZABLE)
-        pygame.display.set_caption("Duel of Labyrinth • Greedy Best-First Search")
+        pygame.display.set_caption("Duel of Labyrinth")
         self.clock = pygame.time.Clock()
 
         # Modern Fonts
@@ -162,7 +162,7 @@ class GameController:
 
         # Title
         self.draw_text("DUEL OF LABYRINTH", self.title_font, ACCENT_GREEN, (w//2, h//3))
-        self.draw_text("Greedy Best-First Search", self.large_font, ACCENT_BLUE, (w//2, h//3 + 60))
+
 
         options = [
             ("EASY", "EASY"),
