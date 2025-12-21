@@ -251,23 +251,39 @@ function init() {
 }
 
 function startGame(lvl) {
-    level = lvl;
-    let size = lvl === 'EASY' ? 15 : lvl === 'MEDIUM' ? 21 : 31;
-    maze = new Maze(size, size);
-    canvas.width = size * TILE_SIZE;
-    canvas.height = size * TILE_SIZE;
+    // 1. Show Blackout
+    let blackout = document.getElementById('blackout-overlay');
+    blackout.classList.remove('hidden');
+    blackout.style.opacity = '1';
 
-    player = new Player(maze.startNode);
-    ai = new GreedyAI(maze.startNode, maze.goalNode);
-
-    gameState = 'PLAYING';
-    startTime = Date.now();
-
+    // 2. Hide Menu immediately
     document.getElementById('menu-overlay').classList.add('hidden');
-    document.getElementById('game-over-overlay').classList.add('hidden');
-    document.getElementById('level-display').innerText = lvl;
 
-    gameLoop();
+    // 3. Wait 1 second
+    setTimeout(() => {
+        level = lvl;
+        let size = lvl === 'EASY' ? 15 : lvl === 'MEDIUM' ? 21 : 31;
+        maze = new Maze(size, size);
+        canvas.width = size * TILE_SIZE;
+        canvas.height = size * TILE_SIZE;
+
+        player = new Player(maze.startNode);
+        ai = new GreedyAI(maze.startNode, maze.goalNode);
+
+        gameState = 'PLAYING';
+        startTime = Date.now();
+
+        document.getElementById('game-over-overlay').classList.add('hidden');
+        document.getElementById('level-display').innerText = lvl;
+
+        // 4. Fade out blackout
+        blackout.style.opacity = '0';
+        setTimeout(() => {
+            blackout.classList.add('hidden');
+        }, 500); // Wait for fade out
+
+        gameLoop();
+    }, 1000);
 }
 
 function handleInput(e) {
