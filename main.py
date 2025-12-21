@@ -550,6 +550,11 @@ class GameController:
         pygame.quit()
         sys.exit()
 
-if __name__ == "__main__":
+import asyncio
+
+async def main():
     game = GameController()
-    game.run()
+    await game.run()
+
+if __name__ == "__main__":
+    asyncio.run(main())
