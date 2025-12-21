@@ -104,10 +104,11 @@ class GameController:
                 "  Z : Down-Left |  C : Down-Right",
                 "",
                 "SYSTEM:",
-                "  R : Restart Level",
-                "  G : Toggle Graph Overlay",
-                "  H : Toggle Heuristics",
-                "  A : Toggle AI Annotations"
+                "  ESC : Return to Menu",
+                "  R   : Restart Level",
+                "  G   : Toggle Graph Overlay",
+                "  H   : Toggle Heuristics",
+                "  A   : Toggle AI Annotations"
             ]),
             ("LEGEND", [
                 "S : Start | G : Goal",
@@ -343,7 +344,7 @@ class GameController:
 
             # Controls Hint
             y = panel_y + panel_h - 40
-            self.draw_text("R: Restart | G: Graph | H: Heuristics", self.small_font, TEXT_SUB, (panel_x + panel_w//2, y), shadow=False)
+            self.draw_text("ESC: Menu | R: Restart | G: Graph", self.small_font, TEXT_SUB, (panel_x + panel_w//2, y), shadow=False)
 
     def draw_game_over(self):
         w, h = self.screen.get_size()
@@ -491,6 +492,7 @@ class GameController:
                     elif event.key == pygame.K_h: self.show_heuristics = not self.show_heuristics
                     elif event.key == pygame.K_a: self.show_annotations = not self.show_annotations
                     elif event.key == pygame.K_r: self.reset_game(self.level)
+                    elif event.key == pygame.K_ESCAPE: self.state = MENU
 
                 elif self.state == GAME_OVER and event.type == pygame.KEYDOWN and event.key == pygame.K_RETURN:
                     self.state = MENU
