@@ -128,11 +128,6 @@ class Maze {
     }
 
     bfsAnalysis() {
-        if (!this.goalNode) return;
-
-        this.bfsMap = new Map();
-        this.maxBfsDistance = 0;
-
         let queue = [{ node: this.goalNode, dist: 0 }];
         this.bfsMap.set(this.goalNode, 0);
 
@@ -152,7 +147,6 @@ class Maze {
 
     aStarOptimal() {
         if (!this.startNode || !this.goalNode) return 0;
-
         let frontier = new PriorityQueue();
         frontier.put(this.startNode, 0);
 
@@ -177,12 +171,7 @@ class Maze {
                 }
             }
         }
-
         return costSoFar.get(this.goalNode) || 0;
-    }
-
-    heuristic(a, b) {
-        return Math.sqrt(Math.pow(a.r - b.r, 2) + Math.pow(a.c - b.c, 2));
     }
 }
 
@@ -291,6 +280,7 @@ class GreedyAI {
             }
             let penalty = nextNode.type === 'TRAP' ? 3 : nextNode.type === 'POWERUP' ? -2 : 0;
 
+            // Log Action
             if (penalty === 3) this.actionLog += "T";
             else if (penalty === -2) this.actionLog += "P";
             else this.actionLog += "M";
@@ -633,4 +623,68 @@ function hideInstructions() {
 }
 
 // Start
+class HuffmanNode {
+    constructor(char, freq, left = null, right = null) {
+        this.char = char;
+        this.freq = freq;
+        this.left = left;
+        this.right = right;
+    }
+}
+
+class Huffman {
+    constructor() {
+        this.codes = {};
+    }
+
+    buildTree(text) {
+        if (!text) return null;
+        let freqs = {};
+        for (let char of text) {
+            freqs[char] = (freqs[char] || 0) + 1;
+        }
+
+        let pq = new PriorityQueue();
+        for (let char in freqs) {
+            pq.put(new HuffmanNode(char, freqs[char]), freqs[char]);
+        }
+
+        while (pq.elements.length > 1) {
+            let left = pq.get();
+            let right = pq.get();
+            let parent = new HuffmanNode(null, left.freq + right.freq, left, right);
+            pq.put(parent, parent.freq);
+        }
+
+        let root = pq.get();
+        this.generateCodes(root, "");
+        return root;
+    }
+
+    generateCodes(node, code) {
+        if (!node) return;
+        if (!node.left && !node.right) {
+            this.codes[node.char] = code;
+            return;
+        }
+        this.generateCodes(node.left, code + "0");
+        this.generateCodes(node.right, code + "1");
+    }
+
+    encode(text) {
+        this.codes = {};
+        this.buildTree(text);
+        return text.split('').map(c => this.codes[c]).join('');
+    }
+
+    getStats(text) {
+        if (!text) return { originalBits: 0, compressedBits: 0, ratio: 0 };
+        let encoded = this.encode(text);
+        let originalBits = text.length * 8;
+        let compressedBits = encoded.length;
+        let ratio = ((1 - compressedBits / originalBits) * 100).toFixed(1);
+        return { originalBits, compressedBits, ratio };
+    }
+}
+
 init();

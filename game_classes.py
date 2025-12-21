@@ -309,6 +309,21 @@ class Maze:
                     self.bfs_map[neighbor] = dist + 1
                     queue.append((neighbor, dist + 1))
 
+    def generate_heuristic_map(self):
+        """Generate Euclidean Distance Map for visualization"""
+        if not self.goal_node: return
+        
+        self.heuristic_map = {}
+        self.max_heuristic_dist = 0
+        
+        for r in range(self.height):
+            for c in range(self.width):
+                node = self.grid[r][c]
+                if node.type != '#':
+                    dist = math.sqrt((node.r - self.goal_node.r)**2 + (node.c - self.goal_node.c)**2)
+                    self.heuristic_map[node] = dist
+                    self.max_heuristic_dist = max(self.max_heuristic_dist, dist)
+
     def a_star_optimal(self):
         """A* for Optimal Reference Cost"""
         if not self.start_node or not self.goal_node: return 0
@@ -335,9 +350,8 @@ class Maze:
                 if neighbor.type == 'T': penalty = 3
                 elif neighbor.type == 'P': penalty = -2
                 
-                # IMPORTANT: Ensure total weight is non-negative for A* stability
-                actual_move_cost = max(0, edge_cost + penalty)
-                new_cost = cost_so_far[current] + actual_move_cost
+                # Prevent negative edge weights to avoid infinite loops (Negative Cycles)
+                new_cost = cost_so_far[current] + max(0.1, edge_cost + penalty)
                 
                 if neighbor not in cost_so_far or new_cost < cost_so_far[neighbor]:
                     cost_so_far[neighbor] = new_cost
@@ -456,6 +470,7 @@ class GreedyAI:
         
         # Enhanced metrics
         self.metrics = PerformanceMetrics()
+        self.visited_nodes = set() # For visualization
         self.compute_path()
         
     def heuristic(self, node):
@@ -468,11 +483,13 @@ class GreedyAI:
         
         came_from = {}
         came_from[self.current_node] = None
+        self.visited_nodes.add(self.current_node)
         
         current = None
         
         while not frontier.empty():
             current = frontier.get()
+            self.visited_nodes.add(current) # Track visited
             
             if current == self.goal_node:
                 break

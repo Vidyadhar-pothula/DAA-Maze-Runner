@@ -5,10 +5,11 @@ import math
 from game_classes import Maze, Player, GreedyAI
 
 # UI States
-MENU = "MENU"
-PLAYING = "PLAYING"
-GAME_OVER = "GAME_OVER"
-INSTRUCTIONS = "INSTRUCTIONS"
+MENU = 0
+PLAYING = 1
+GAME_OVER = 2
+INSTRUCTIONS = 3
+REPLAY = 4
 
 # Constants
 TILE_SIZE = 30
@@ -164,29 +165,60 @@ class GameController:
         print(f"Setting display mode: {width}x{height}")
         self.screen = pygame.display.set_mode((width, height), pygame.RESIZABLE)
 
+        # Draw Loading Screen
+        self.screen.fill(BG_PRIMARY)
+        self.draw_text(f"Loading {level} Level...", self.large_font, ACCENT_BLUE, (width//2, height//2))
+        self.draw_text("Generating Maze & Analyzing...", self.medium_font, TEXT_SUB, (width//2, height//2 + 50))
+        pygame.display.flip()
+        pygame.event.pump()
+
         print("Generating Maze...")
         self.maze = Maze(width=w, height=h)
         print("Maze Generated")
+        pygame.event.pump()
         
         # Run Analysis
         print("Running BFS Analysis...")
         self.maze.bfs_analysis()
+        self.maze.generate_heuristic_map() # Generate Greedy Map
         print("BFS Analysis Complete")
+        pygame.event.pump()
         
         print("Running A* Optimal...")
         self.optimal_cost = self.maze.a_star_optimal()
         print(f"A* Complete. Cost: {self.optimal_cost}")
+        pygame.event.pump()
         
         print("Initializing Player and AI...")
         self.player = Player(self.maze.start_node)
         self.ai = GreedyAI(self.maze.start_node, self.maze.goal_node, self.maze)
         print("Initialization Complete")
+        pygame.event.pump()
 
         self.game_over = False
         self.consumed_items = set()
         self.start_time = time.time()
         self.elapsed_time = 0
         self.show_bfs = False
+        self.map_mode = 0 # 0=Off, 1=BFS, 2=Greedy
+        
+        # Replay System
+        self.history = [] # List of (player_node, ai_node, ai_path_index)
+        self.replay_index = 0
+        self.replay_speed = 0
+        self.show_heuristics = False
+        self.show_graph = False
+        self.show_visited = False
+        self.record_frame()
+
+    def record_frame(self):
+        # Record current state for replay
+        self.history.append({
+            'player_pos': (self.player.current_node.r, self.player.current_node.c),
+            'ai_pos': (self.ai.current_node.r, self.ai.current_node.c),
+            'ai_path': list(self.ai.path), # Copy
+            'time': self.elapsed_time
+        })
 
     def draw_menu(self):
         w, h = self.screen.get_size()
@@ -229,14 +261,20 @@ class GameController:
         for r in range(self.maze.height):
             for c in range(self.maze.width):
                 node = self.maze.get_node(r, c)
+                if node is None: continue # Safety check
                 rect = pygame.Rect(c * TILE_SIZE, r * TILE_SIZE + GRID_OFFSET_Y, TILE_SIZE, TILE_SIZE)
 
-                dist = max(abs(node.r - self.player.current_node.r), abs(node.c - self.player.current_node.c))
-                visible = dist <= 3 or node.visited_by_player or node in (self.maze.start_node, self.maze.goal_node)
-
-                if not visible:
-                    pygame.draw.rect(self.screen, BG_PRIMARY, rect)
-                    continue
+                # Fog of War Logic
+                if self.state != REPLAY:
+                    if self.player and self.player.current_node:
+                        dist = max(abs(node.r - self.player.current_node.r), abs(node.c - self.player.current_node.c))
+                        visible = dist <= 3 or node.visited_by_player or node in (self.maze.start_node, self.maze.goal_node)
+                    else:
+                        visible = True # Fallback if player not ready
+                    
+                    if not visible:
+                        pygame.draw.rect(self.screen, BG_PRIMARY, rect)
+                        continue
 
                 if node.type == '#':
                     color = BG_SECONDARY
@@ -244,25 +282,33 @@ class GameController:
                 else:
                     color = (20, 20, 30) # Darker floor for contrast
                     
-                    # BFS Visualization
-                    if self.show_bfs and hasattr(self.maze, 'bfs_map') and node in self.maze.bfs_map:
+                    # Map Visualization
+                    mode = getattr(self, 'map_mode', 0)
+                    if not mode and getattr(self, 'show_bfs', False): mode = 1 # Fallback
+
+                    if mode == 1 and hasattr(self.maze, 'bfs_map') and node in self.maze.bfs_map:
+                        # BFS (Cyan)
                         dist = self.maze.bfs_map[node]
-                        max_dist = self.maze.max_bfs_distance
-                        intensity = 1 - (dist / max_dist) if max_dist > 0 else 1
-                        intensity = max(0.0, min(1.0, intensity)) # Clamp
-                        
-                        # Cyan gradient
+                        max_dist = self.maze.max_bfs_distance if self.maze.max_bfs_distance > 0 else 1
+                        intensity = 1 - (dist / max_dist)
+                        intensity = max(0.0, min(1.0, intensity))
                         g = int(255 * intensity * 0.5)
-                        b = int(255 * intensity * 0.5)
+                        b = int(255 * intensity)
                         color = (0, g, b)
                     
-                    try:
-                        pygame.draw.rect(self.screen, color, rect)
-                        # Subtle grid lines
-                        pygame.draw.rect(self.screen, (40, 40, 55), rect, 1)
-                    except TypeError:
-                        # Fallback for invalid color
-                        pygame.draw.rect(self.screen, (50, 50, 50), rect)
+                    elif mode == 2 and hasattr(self.maze, 'heuristic_map') and node in self.maze.heuristic_map:
+                        # Greedy Heuristic (Magenta/Red)
+                        dist = self.maze.heuristic_map[node]
+                        max_dist = self.maze.max_heuristic_dist if self.maze.max_heuristic_dist > 0 else 1
+                        intensity = 1 - (dist / max_dist)
+                        intensity = max(0.0, min(1.0, intensity))
+                        r = int(255 * intensity)
+                        b = int(255 * intensity * 0.5)
+                        color = (r, 0, b)
+
+                    pygame.draw.rect(self.screen, color, rect)
+                    # Subtle grid lines
+                    pygame.draw.rect(self.screen, (40, 40, 55), rect, 1)
 
                 if (r,c) not in self.consumed_items:
                     if node.type == 'T':
@@ -453,6 +499,94 @@ class GameController:
 
         if time.time() % 1.5 > 0.5:
             self.draw_text("Press ENTER to Menu", self.large_font, ACCENT_BLUE, (cx, cy + 160))
+        
+        self.draw_text("Press P to Watch Replay", self.medium_font, TEXT_SUB, (cx, cy + 200))
+
+    def draw_replay(self):
+        # Debug Logging
+        # print(f"Replay Frame: {self.replay_index}, History: {len(self.history)}")
+        
+        self.screen.fill(BG_PRIMARY)
+        try:
+            self.draw_grid() # Draws base maze and BFS if enabled
+        except Exception as e:
+            print(f"Draw Grid Error: {e}")
+            raise e
+        
+        if not self.history: return
+
+        # Get state from history
+        state = self.history[self.replay_index]
+        
+        # --- VISUALIZATION LAYERS ---
+        
+        # 1. Graph Representation (Nodes & Edges)
+        if self.show_graph:
+            for r in range(self.maze.height):
+                for c in range(self.maze.width):
+                    node = self.maze.get_node(r, c)
+                    if node.type != '#':
+                        cx = c * TILE_SIZE + TILE_SIZE//2
+                        cy = r * TILE_SIZE + GRID_OFFSET_Y + TILE_SIZE//2
+                        # Draw Edges
+                        for neighbor in self.maze.get_neighbors(node):
+                            nx = neighbor.c * TILE_SIZE + TILE_SIZE//2
+                            ny = neighbor.r * TILE_SIZE + GRID_OFFSET_Y + TILE_SIZE//2
+                            pygame.draw.line(self.screen, (50, 50, 70), (cx, cy), (nx, ny), 1)
+                        # Draw Node
+                        pygame.draw.circle(self.screen, (80, 80, 100), (cx, cy), 2)
+
+        # 2. AI Search Process (Visited Nodes)
+        if self.show_visited and hasattr(self.ai, 'visited_nodes'):
+            for node in self.ai.visited_nodes:
+                 vx = node.c * TILE_SIZE
+                 vy = node.r * TILE_SIZE + GRID_OFFSET_Y
+                 # Draw a faint blue overlay for visited nodes
+                 s = pygame.Surface((TILE_SIZE, TILE_SIZE), pygame.SRCALPHA)
+                 s.fill((100, 100, 255, 40)) # Transparent Blue
+                 self.screen.blit(s, (vx, vy))
+                 # Optional: Small dot
+                 # pygame.draw.circle(self.screen, (100, 100, 255), (vx + TILE_SIZE//2, vy + TILE_SIZE//2), 2)
+
+        # 3. Entities
+        # Draw Player
+        pr, pc = state['player_pos']
+        px = pc * TILE_SIZE
+        py = pr * TILE_SIZE + GRID_OFFSET_Y
+        pygame.draw.circle(self.screen, ACCENT_GREEN, (px + TILE_SIZE//2, py + TILE_SIZE//2), TILE_SIZE//3)
+        
+        # Draw AI
+        ar, ac = state['ai_pos']
+        ax = ac * TILE_SIZE
+        ay = ar * TILE_SIZE + GRID_OFFSET_Y
+        pygame.draw.circle(self.screen, ACCENT_ORANGE, (ax + TILE_SIZE//2, ay + TILE_SIZE//2), TILE_SIZE//3)
+        
+        # 4. Greedy Heuristic Lens (AI Path)
+        if self.show_heuristics:
+            path = state['ai_path']
+            if len(path) > 1:
+                points = []
+                for node in path:
+                    points.append((node.c * TILE_SIZE + TILE_SIZE//2, 
+                                   node.r * TILE_SIZE + GRID_OFFSET_Y + TILE_SIZE//2))
+                pygame.draw.lines(self.screen, (255, 100, 100), False, points, 2)
+                
+                # Draw Line to Goal
+                goal_x = self.maze.goal_node.c * TILE_SIZE + TILE_SIZE//2
+                goal_y = self.maze.goal_node.r * TILE_SIZE + GRID_OFFSET_Y + TILE_SIZE//2
+                pygame.draw.line(self.screen, (255, 255, 0), (ax + TILE_SIZE//2, ay + TILE_SIZE//2), (goal_x, goal_y), 1)
+
+        # Draw HUD Overlay
+        w, h = self.screen.get_size()
+        pygame.draw.rect(self.screen, (0, 0, 0, 200), (0, h-80, w, 80))
+        
+        progress = (self.replay_index / (len(self.history)-1)) if len(self.history) > 1 else 1
+        bar_w = w - 40
+        pygame.draw.rect(self.screen, (100, 100, 100), (20, h-60, bar_w, 10))
+        pygame.draw.rect(self.screen, ACCENT_BLUE, (20, h-60, bar_w * progress, 10))
+        
+        self.draw_text(f"REPLAY | Frame: {self.replay_index}/{len(self.history)-1} | Speed: {self.replay_speed}x", self.small_font, TEXT_MAIN, (w//2, h-35))
+        self.draw_text("Space: Pause | Arrows: Seek | V: AI Logic (Visited) | G: Graph | B: BFS | H: Path", self.small_font, TEXT_SUB, (w//2, h-15))
 
     def process_move(self, agent):
         node = agent.current_node
@@ -490,6 +624,7 @@ class GameController:
             if self.player.move((dx, dy), self.maze):
                 self.process_move(self.player)
                 self.last_move_time = now
+                self.record_frame()
 
     def run(self):
         running = True
@@ -527,6 +662,8 @@ class GameController:
                         if event.key in (pygame.K_1, pygame.K_2, pygame.K_3):
                             lvl = ["EASY", "MEDIUM", "HARD"][event.key - pygame.K_1]
                             self.reset_game(lvl)
+                            self.state = PLAYING
+                            self.start_time = time.time()
                         elif event.key == pygame.K_i:
                             self.state = INSTRUCTIONS
                             self.instruction_scroll_y = 0
@@ -559,8 +696,32 @@ class GameController:
                     elif event.key == pygame.K_r: self.reset_game(self.level)
                     elif event.key == pygame.K_ESCAPE: self.state = MENU
 
-                elif self.state == GAME_OVER and event.type == pygame.KEYDOWN and event.key == pygame.K_RETURN:
-                    self.state = MENU
+                elif self.state == GAME_OVER and event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_RETURN:
+                        self.state = MENU
+                    elif event.key == pygame.K_p:
+                        self.state = REPLAY
+                        self.replay_index = 0
+                        self.replay_speed = 0.5 # Slower default
+                        self.map_mode = 2 # Default to Greedy Map for visualization
+                        self.show_heuristics = True # Show path lines
+                        self.show_graph = True # Show Graph Nodes/Edges
+                        self.show_visited = True # Show visited by default for "AI Logic"
+
+                elif self.state == REPLAY and event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_ESCAPE: self.state = MENU
+                    elif event.key == pygame.K_RIGHT: self.replay_index = min(len(self.history)-1, self.replay_index + 1)
+                    elif event.key == pygame.K_LEFT: self.replay_index = max(0, self.replay_index - 1)
+                    elif event.key == pygame.K_SPACE: self.replay_speed = 0 if self.replay_speed > 0 else 0.5
+                    elif event.key == pygame.K_UP: self.replay_speed += 0.5
+                    elif event.key == pygame.K_DOWN: self.replay_speed = max(0, self.replay_speed - 0.5)
+                    # Toggles
+                    elif event.key == pygame.K_b: 
+                        # Cycle: 0=Off, 1=BFS, 2=Greedy Map
+                        self.map_mode = (self.map_mode + 1) % 3
+                    elif event.key == pygame.K_h: self.show_heuristics = not self.show_heuristics
+                    elif event.key == pygame.K_g: self.show_graph = not self.show_graph # Graph Toggle
+                    elif event.key == pygame.K_v: self.show_visited = not self.show_visited # Visited Toggle
 
                 elif self.state == INSTRUCTIONS and event.type == pygame.KEYDOWN:
                     if event.key in (pygame.K_ESCAPE, pygame.K_BACKSPACE):
@@ -579,31 +740,41 @@ class GameController:
             elif self.state == PLAYING:
                 self.handle_input()
                 self.elapsed_time = time.time() - self.start_time
+                
+                # AI Logic
                 if not self.ai.finished and int(self.elapsed_time * self.ai_speed) > self.ai.steps:
                     self.ai.choose_move(self.maze)
                     self.process_move(self.ai)
+                    self.record_frame()
+
                 if self.player.finished and self.ai.finished:
                     self.state = GAME_OVER
-
+                
                 self.screen.fill(BG_PRIMARY)
-                self.draw_graph_overlay()
                 self.draw_grid()
                 self.draw_entities()
                 self.draw_hud()
 
-                w, h = self.screen.get_size()
-                if self.player.finished and not self.ai.finished:
-                    self.draw_text("Waiting for AI...", self.large_font, ACCENT_YELLOW, (w//2, h-80))
-                elif self.ai.finished and not self.player.finished:
-                    self.draw_text("AI Finished! Can you beat its score?", self.large_font, ACCENT_ORANGE, (w//2, h-80))
+            elif self.state == REPLAY:
+                try:
+                    self.draw_replay()
+                    if self.replay_speed > 0:
+                        speed_factor = int(self.replay_speed * 5 + 1)
+                        if frame_count % max(1, 60 // speed_factor) == 0:
+                             self.replay_index = min(len(self.history)-1, self.replay_index + 1)
+                except Exception as e:
+                    print(f"Replay Error: {e}")
+                    with open("error_log.txt", "w") as f:
+                        import traceback
+                        traceback.print_exc(file=f)
+                        f.write(f"\nReplay Error: {e}")
+                    self.state = MENU # Exit replay on error
 
             elif self.state == GAME_OVER:
-                self.screen.fill(BG_PRIMARY)
-                self.draw_grid()
-                self.draw_entities()
                 self.draw_game_over()
 
             pygame.display.flip()
+
 
         pygame.quit()
         sys.exit()

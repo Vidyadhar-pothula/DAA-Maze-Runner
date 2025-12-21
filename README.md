@@ -12,7 +12,7 @@ A maze exploration game where you compete against a Greedy Best-First Search AI.
 - **Pure Greedy Best-First Search**: Demonstrates greedy algorithm behavior with heuristic-based decisions
 - **Graph-Based Architecture**: Explicit graph representation with adjacency lists and edge weights
 - **Real-time Performance Metrics**: Track nodes explored, visited, backtracking, and efficiency
-- **Educational Annotations**: See AI decision-making process in real-time
+- **Educational Annotations**: See AI decision-making process in real-timenope not ata
 
 ### Visualization Features
 - **Graph Overlay Mode**: Toggle to see actual graph edges and connectivity
