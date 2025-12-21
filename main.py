@@ -1,0 +1,534 @@
+import pygame
+import sys
+import time
+import math
+from game_classes import Maze, Player, GreedyAI
+
+# UI States
+MENU = "MENU"
+PLAYING = "PLAYING"
+GAME_OVER = "GAME_OVER"
+INSTRUCTIONS = "INSTRUCTIONS"
+
+# Constants
+TILE_SIZE = 30
+FPS = 60  # Smoother animation
+GRID_OFFSET_Y = 65 # Space for top HUD
+
+# Modern Dark Theme Colors
+BG_PRIMARY = (30, 30, 46)      # Deep Blue-Grey
+BG_SECONDARY = (65, 65, 90)    # Lighter for Walls (High Contrast)
+CARD_BG = (45, 45, 65, 230)    # Glassy panel
+ACCENT_BLUE = (137, 180, 250)  # Soft Blue
+ACCENT_PURPLE = (203, 166, 247)# Soft Purple
+ACCENT_GREEN = (166, 227, 161) # Mint Green
+ACCENT_RED = (243, 139, 168)   # Soft Red
+ACCENT_ORANGE = (250, 179, 135)# Soft Orange
+ACCENT_YELLOW = (249, 226, 175)# Soft Yellow
+TEXT_MAIN = (205, 214, 244)    # Off-white
+TEXT_SUB = (166, 173, 200)     # Muted text
+BORDER_COLOR = (88, 91, 112)   # Subtle border
+
+class GameController:
+    def __init__(self):
+        pygame.init()
+        self.screen = pygame.display.set_mode((1000, 720), pygame.RESIZABLE)
+        pygame.display.set_caption("Maze Runner • Greedy Best-First Search")
+        self.clock = pygame.time.Clock()
+
+        # Modern Fonts
+        self.title_font = pygame.font.SysFont('Arial', 64, bold=True)
+        self.heading_font = pygame.font.SysFont('Arial', 32, bold=True)
+        self.large_font = pygame.font.SysFont('Arial', 24)
+        self.medium_font = pygame.font.SysFont('Arial', 18)
+        self.font = pygame.font.SysFont('Consolas', 16) # Keep Consolas for data/grid
+        self.small_font = pygame.font.SysFont('Arial', 14)
+
+        self.state = MENU
+        self.level = "MEDIUM"
+        self.ai_speed = 2
+        self.grid_size = (21, 21)
+
+        # Toggles
+        self.show_graph = False
+        self.show_heuristics = False
+        self.show_annotations = False
+
+        # Animation & Scroll
+        self.pulse_time = 0
+        self.instruction_scroll_y = 0
+        self.max_scroll = 0
+        self.scrollbar_grabbed = False
+        self.last_move_time = 0
+
+        self.reset_game("MEDIUM")
+
+    def draw_text(self, text, font, color, pos, anchor="center", shadow=True):
+        surf = font.render(text, True, color)
+        rect = surf.get_rect()
+        setattr(rect, anchor, pos)
+        
+        if shadow:
+            sh = font.render(text, True, (0, 0, 0, 100))
+            sh_rect = sh.get_rect()
+            setattr(sh_rect, anchor, (pos[0] + 2, pos[1] + 2))
+            self.screen.blit(sh, sh_rect)
+            
+        self.screen.blit(surf, rect)
+
+    def draw_instructions(self):
+        w, h = self.screen.get_size()
+        self.screen.fill(BG_PRIMARY)
+
+        self.draw_text("HOW TO PLAY", self.title_font, ACCENT_BLUE, (w//2, 90))
+
+        content_x, content_y = 120, 180
+        line_h = 36
+        header_h = 56
+
+        sections = [
+            ("OBJECTIVE", [
+                "Navigate to the goal (G) with the lowest possible cost.",
+                "Compete head-to-head against a Greedy Best-First Search AI.",
+                "Collect Power-Ups (-2 cost) and avoid Traps (+3 cost)."
+            ]),
+            ("CONTROLS", [
+                "WASD / Arrows : Move",
+                "Q, E, Z, C : Diagonals",
+                "G : Toggle Graph | H : Heuristics | A : Annotations"
+            ]),
+            ("LEGEND", [
+                "S : Start | G : Goal",
+                "Red Circle : Trap (+3) | Green Circle : Power-Up (-2)",
+                "# : Wall"
+            ])
+        ]
+
+        total_h = sum(header_h + len(lines) * line_h + 40 for _, lines in sections)
+        self.max_scroll = max(0, total_h - (h - 220))
+
+        # Scrollbar
+        if self.max_scroll > 0:
+            sb_x = w - 20
+            sb_h = h - 200
+            pygame.draw.rect(self.screen, BG_SECONDARY, (sb_x, 100, 8, sb_h), border_radius=4)
+            handle_h = max(40, int(sb_h * sb_h / (total_h + 100)))
+            ratio = self.instruction_scroll_y / self.max_scroll
+            handle_y = 100 + int(ratio * (sb_h - handle_h))
+            pygame.draw.rect(self.screen, ACCENT_BLUE, (sb_x, handle_y, 8, handle_h), border_radius=4)
+
+        clip = pygame.Rect(content_x, content_y, w - 200, h - content_y - 80)
+        self.screen.set_clip(clip)
+
+        y = content_y - self.instruction_scroll_y
+        for header, lines in sections:
+            self.draw_text(header, self.heading_font, ACCENT_PURPLE, (content_x, y), anchor="midleft", shadow=False)
+            y += header_h
+            for line in lines:
+                surf = self.medium_font.render(line, True, TEXT_MAIN)
+                self.screen.blit(surf, (content_x + 20, y))
+                y += line_h
+            y += 40
+
+        self.screen.set_clip(None)
+
+        footer = self.small_font.render("ESC / BACKSPACE : Back", True, TEXT_SUB)
+        self.screen.blit(footer, footer.get_rect(center=(w//2, h-40)))
+
+    def reset_game(self, level):
+        self.level = level
+        speeds = {"EASY": 1.0, "MEDIUM": 2.0, "HARD": 4.0}
+        sizes = {"EASY": (15,15), "MEDIUM": (21,21), "HARD": (25,25)}
+        self.grid_size = sizes[level]
+        self.ai_speed = speeds[level]
+
+        w, h = self.grid_size
+        width = w * TILE_SIZE + 340
+        height = h * TILE_SIZE + 120 + GRID_OFFSET_Y
+        self.screen = pygame.display.set_mode((width, height), pygame.RESIZABLE)
+
+        self.maze = Maze(width=w, height=h)
+        self.player = Player(self.maze.start_node)
+        self.ai = GreedyAI(self.maze.start_node)
+
+        self.game_over = False
+        self.consumed_items = set()
+        self.start_time = time.time()
+        self.elapsed_time = 0
+
+    def draw_menu(self):
+        w, h = self.screen.get_size()
+        self.screen.fill(BG_PRIMARY)
+
+        # Title
+        self.draw_text("MAZE RUNNER", self.title_font, ACCENT_GREEN, (w//2, h//3))
+        self.draw_text("Greedy Best-First Search", self.large_font, ACCENT_BLUE, (w//2, h//3 + 60))
+
+        options = [
+            ("EASY", "EASY"),
+            ("MEDIUM", "MEDIUM"),
+            ("HARD", "HARD"),
+            ("INSTRUCTIONS", INSTRUCTIONS)
+        ]
+
+        mx, my = pygame.mouse.get_pos()
+        base_y = h//2 + 20
+
+        for i, (text, val) in enumerate(options):
+            y = base_y + i * 70
+            rect = pygame.Rect(w//2 - 150, y - 30, 300, 60)
+            hovered = rect.collidepoint(mx, my)
+            
+            # Button Style
+            color = ACCENT_PURPLE if hovered else BG_SECONDARY
+            text_col = BG_PRIMARY if hovered else TEXT_MAIN
+            
+            pygame.draw.rect(self.screen, color, rect, border_radius=12)
+            if not hovered:
+                pygame.draw.rect(self.screen, BORDER_COLOR, rect, 2, border_radius=12)
+            
+            text_surf = self.heading_font.render(text, True, text_col)
+            self.screen.blit(text_surf, text_surf.get_rect(center=rect.center))
+
+        hint = self.small_font.render("Select a level to start", True, TEXT_SUB)
+        self.screen.blit(hint, hint.get_rect(center=(w//2, h - 50)))
+
+    def draw_grid(self):
+        for r in range(self.maze.height):
+            for c in range(self.maze.width):
+                node = self.maze.get_node(r, c)
+                rect = pygame.Rect(c * TILE_SIZE, r * TILE_SIZE + GRID_OFFSET_Y, TILE_SIZE, TILE_SIZE)
+
+                dist = max(abs(node.r - self.player.current_node.r), abs(node.c - self.player.current_node.c))
+                visible = dist <= 3 or node.visited_by_player or node in (self.maze.start_node, self.maze.goal_node)
+
+                if not visible:
+                    pygame.draw.rect(self.screen, BG_PRIMARY, rect)
+                    continue
+
+                if node.type == '#':
+                    color = BG_SECONDARY
+                    pygame.draw.rect(self.screen, color, rect)
+                else:
+                    color = (20, 20, 30) # Darker floor for contrast
+                    if node.explored_by_ai and self.show_annotations:
+                        color = (45, 45, 65)
+                    pygame.draw.rect(self.screen, color, rect)
+                    # Subtle grid lines
+                    pygame.draw.rect(self.screen, (40, 40, 55), rect, 1)
+
+                if (r,c) not in self.consumed_items:
+                    if node.type == 'T':
+                        pygame.draw.circle(self.screen, ACCENT_RED, rect.center, TILE_SIZE//4)
+                    elif node.type == 'P':
+                        pygame.draw.circle(self.screen, ACCENT_GREEN, rect.center, TILE_SIZE//4)
+
+                if node == self.maze.start_node and self.player.current_node != node:
+                    self.draw_text("S", self.font, ACCENT_GREEN, rect.center, shadow=False)
+                elif node == self.maze.goal_node:
+                    self.draw_text("G", self.font, ACCENT_PURPLE, rect.center, shadow=False)
+
+                if self.show_heuristics and node.heuristic_value is not None and visible:
+                    h = f"{node.heuristic_value:.1f}"
+                    hs = self.small_font.render(h, True, ACCENT_BLUE)
+                    self.screen.blit(hs, (rect.x + 2, rect.y + 2))
+
+    def draw_graph_overlay(self):
+        if not self.show_graph: return
+        drawn = set()
+        for node in self.maze.adjacency_list:
+            dist = max(abs(node.r - self.player.current_node.r), abs(node.c - self.player.current_node.c))
+            if dist > 4 and not node.visited_by_player and node not in (self.maze.start_node, self.maze.goal_node):
+                continue
+            pos = (node.c * TILE_SIZE + TILE_SIZE//2, node.r * TILE_SIZE + TILE_SIZE//2 + GRID_OFFSET_Y)
+            for neigh, wt in self.maze.adjacency_list[node]:
+                edge = tuple(sorted([(node.r,node.c),(neigh.r,neigh.c)]))
+                if edge in drawn: continue
+                drawn.add(edge)
+                npos = (neigh.c * TILE_SIZE + TILE_SIZE//2, neigh.r * TILE_SIZE + TILE_SIZE//2 + GRID_OFFSET_Y)
+                color = ACCENT_GREEN if wt <= 0 else ACCENT_RED if wt >= 3 else (60, 60, 80)
+                pygame.draw.line(self.screen, color, pos, npos, 1)
+
+    def draw_entities(self):
+        # Player trail
+        if len(self.player.path) > 1:
+            points = [(n.c * TILE_SIZE + TILE_SIZE//2, n.r * TILE_SIZE + TILE_SIZE//2 + GRID_OFFSET_Y) for n in self.player.path]
+            if len(points) > 1:
+                pygame.draw.lines(self.screen, ACCENT_BLUE, False, points, 2)
+
+        # AI trail
+        if len(self.ai.path) > 1 and self.show_annotations:
+            points = [(n.c * TILE_SIZE + TILE_SIZE//2, n.r * TILE_SIZE + TILE_SIZE//2 + GRID_OFFSET_Y) for n in self.ai.path]
+            if len(points) > 1:
+                pygame.draw.lines(self.screen, ACCENT_ORANGE, False, points, 2)
+
+        # Player
+        pr = pygame.Rect(self.player.current_node.c * TILE_SIZE, self.player.current_node.r * TILE_SIZE + GRID_OFFSET_Y, TILE_SIZE, TILE_SIZE)
+        pygame.draw.circle(self.screen, ACCENT_BLUE, pr.center, TILE_SIZE//3)
+        pygame.draw.circle(self.screen, TEXT_MAIN, pr.center, TILE_SIZE//3, 2) # White border
+        
+        # AI
+        ar = pygame.Rect(self.ai.current_node.c * TILE_SIZE, self.ai.current_node.r * TILE_SIZE + GRID_OFFSET_Y, TILE_SIZE, TILE_SIZE)
+        pygame.draw.circle(self.screen, ACCENT_ORANGE, ar.center, TILE_SIZE//3)
+
+        if self.show_annotations:
+            for node, _ in self.ai.current_candidates:
+                cr = pygame.Rect(node.c * TILE_SIZE, node.r * TILE_SIZE + GRID_OFFSET_Y, TILE_SIZE, TILE_SIZE)
+                pygame.draw.rect(self.screen, (100, 200, 255, 50), cr, 2)
+
+    def draw_hud(self):
+        w, h = self.screen.get_size()
+        
+        # Top Bar (Level & Time)
+        bar_h = 60
+        pygame.draw.rect(self.screen, CARD_BG, (0, 0, w, bar_h))
+        pygame.draw.line(self.screen, BORDER_COLOR, (0, bar_h), (w, bar_h))
+
+        self.draw_text(f"LEVEL: {self.level}", self.heading_font, ACCENT_BLUE, (20, bar_h//2), anchor="midleft", shadow=False)
+        self.draw_text(f"TIME: {self.elapsed_time:.1f}s", self.heading_font, ACCENT_PURPLE, (w - 20, bar_h//2), anchor="midright", shadow=False)
+        self.draw_text("MAZE RUNNER", self.heading_font, TEXT_MAIN, (w//2, bar_h//2), shadow=False)
+
+        # Side Panel (Metrics)
+        panel_w = 300
+        panel_x = w - panel_w - 20
+        panel_y = bar_h + 20
+        panel_h = h - bar_h - 40
+        
+        # Only show full metrics if there is space
+        if w > self.grid_size[0] * TILE_SIZE + 320:
+            rect = pygame.Rect(panel_x, panel_y, panel_w, panel_h)
+            pygame.draw.rect(self.screen, CARD_BG, rect, border_radius=12)
+            pygame.draw.rect(self.screen, BORDER_COLOR, rect, 1, border_radius=12)
+
+            y = panel_y + 30
+            self.draw_text("METRICS", self.large_font, ACCENT_GREEN, (panel_x + panel_w//2, y), shadow=False)
+            y += 40
+
+            # Scores
+            self.draw_text("PLAYER", self.medium_font, ACCENT_BLUE, (panel_x + 70, y), shadow=False)
+            self.draw_text("AI", self.medium_font, ACCENT_ORANGE, (panel_x + 230, y), shadow=False)
+            y += 30
+            self.draw_text(f"Cost: {self.player.total_cost}", self.font, TEXT_MAIN, (panel_x + 70, y), shadow=False)
+            self.draw_text(f"Cost: {self.ai.total_cost}", self.font, TEXT_MAIN, (panel_x + 230, y), shadow=False)
+            y += 20
+            self.draw_text(f"Steps: {self.player.steps}", self.font, TEXT_SUB, (panel_x + 70, y), shadow=False)
+            self.draw_text(f"Steps: {self.ai.steps}", self.font, TEXT_SUB, (panel_x + 230, y), shadow=False)
+            
+            y += 40
+            pygame.draw.line(self.screen, BORDER_COLOR, (panel_x + 20, y), (panel_x + panel_w - 20, y))
+            y += 20
+
+            # AI Analysis
+            stats = [
+                f"Explored: {self.ai.metrics.nodes_explored}",
+                f"Backtracks: {self.ai.metrics.backtrack_count}",
+                f"Efficiency: {self.ai.get_efficiency_vs_optimal(self.maze.optimal_path_length)*100:.1f}%"
+            ]
+            
+            for line in stats:
+                self.draw_text(line, self.font, TEXT_MAIN, (panel_x + panel_w//2, y), shadow=False)
+                y += 25
+
+            # Controls Hint
+            y = panel_y + panel_h - 40
+            self.draw_text("R: Restart | G: Graph | H: Heuristics", self.small_font, TEXT_SUB, (panel_x + panel_w//2, y), shadow=False)
+
+    def draw_game_over(self):
+        w, h = self.screen.get_size()
+        overlay = pygame.Surface((w, h), pygame.SRCALPHA)
+        overlay.fill((20, 20, 30, 220))
+        self.screen.blit(overlay, (0, 0))
+
+        card_w, card_h = 600, 450
+        cx, cy = w//2, h//2
+        card = pygame.Rect(cx - card_w//2, cy - card_h//2, card_w, card_h)
+        
+        pygame.draw.rect(self.screen, BG_SECONDARY, card, border_radius=20)
+        pygame.draw.rect(self.screen, BORDER_COLOR, card, 2, border_radius=20)
+
+        self.draw_text("GAME OVER", self.title_font, ACCENT_RED, (cx, cy - 160))
+
+        p_win = self.player.current_node == self.maze.goal_node
+        a_win = self.ai.current_node == self.maze.goal_node
+
+        if p_win and not a_win:
+            result, col = "VICTORY!", ACCENT_GREEN
+        elif a_win and not p_win:
+            result, col = "AI WINS!", ACCENT_ORANGE
+        elif p_win and a_win:
+            if self.player.total_cost < self.ai.total_cost:
+                result, col = "YOU WIN! (Lower Cost)", ACCENT_GREEN
+            elif self.ai.total_cost < self.player.total_cost:
+                result, col = "AI WINS! (Lower Cost)", ACCENT_ORANGE
+            else:
+                result, col = "DRAW!", ACCENT_BLUE
+        else:
+            result, col = "NO ONE REACHED GOAL", TEXT_SUB
+
+        self.draw_text(result, self.heading_font, col, (cx, cy - 90))
+
+        y = cy - 20
+        stats = [
+            f"Your Cost: {self.player.total_cost}  |  AI Cost: {self.ai.total_cost}",
+            f"Your Steps: {self.player.steps}  |  AI Steps: {self.ai.steps}",
+            "",
+            f"AI Efficiency: {self.ai.get_efficiency_vs_optimal(self.maze.optimal_path_length)*100:.1f}%"
+        ]
+
+        for line in stats:
+            if line:
+                self.draw_text(line, self.medium_font, TEXT_MAIN, (cx, y), shadow=False)
+            y += 35
+
+        if time.time() % 1.5 > 0.5:
+            self.draw_text("Press ENTER to Menu", self.large_font, ACCENT_BLUE, (cx, cy + 160))
+
+    def process_move(self, agent):
+        node = agent.current_node
+        cost = 1 if (node.r, node.c) in self.consumed_items else node.cost
+
+        if node.type == 'T' and (node.r, node.c) not in self.consumed_items:
+            self.consumed_items.add((node.r, node.c))
+        elif node.type == 'P' and (node.r, node.c) not in self.consumed_items:
+            self.consumed_items.add((node.r, node.c))
+
+        agent.total_cost = max(0, agent.total_cost + cost)
+        if node == self.maze.goal_node:
+            agent.finished = True
+
+    def handle_input(self):
+        if self.player.finished: return
+
+        keys = pygame.key.get_pressed()
+        now = time.time()
+        if now - self.last_move_time < 0.12: return  # Move delay
+
+        dx, dy = 0, 0
+        # Cardinals
+        if keys[pygame.K_w] or keys[pygame.K_UP]: dx, dy = -1, 0
+        elif keys[pygame.K_s] or keys[pygame.K_DOWN]: dx, dy = 1, 0
+        elif keys[pygame.K_a] or keys[pygame.K_LEFT]: dx, dy = 0, -1
+        elif keys[pygame.K_d] or keys[pygame.K_RIGHT]: dx, dy = 0, 1
+        # Diagonals
+        elif keys[pygame.K_q]: dx, dy = -1, -1
+        elif keys[pygame.K_e]: dx, dy = -1, 1
+        elif keys[pygame.K_z]: dx, dy = 1, -1
+        elif keys[pygame.K_c]: dx, dy = 1, 1
+
+        if dx != 0 or dy != 0:
+            if self.player.move((dx, dy), self.maze):
+                self.process_move(self.player)
+                self.last_move_time = now
+
+    def run(self):
+        running = True
+        while running:
+            self.clock.tick(FPS)
+            self.pulse_time = time.time()
+            mouse_pos = pygame.mouse.get_pos()
+
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    running = False
+
+                elif event.type == pygame.VIDEORESIZE:
+                    self.screen = pygame.display.set_mode((event.w, event.h), pygame.RESIZABLE)
+
+                elif event.type == pygame.MOUSEWHEEL and self.state == INSTRUCTIONS:
+                    self.instruction_scroll_y = max(0, min(self.max_scroll, self.instruction_scroll_y - event.y * 40))
+
+                elif event.type == pygame.MOUSEBUTTONDOWN and self.state == INSTRUCTIONS and self.max_scroll > 0:
+                    sb_x = self.screen.get_width() - 40
+                    if sb_x <= mouse_pos[0] <= sb_x + 16:
+                        self.scrollbar_grabbed = True
+
+                elif event.type == pygame.MOUSEBUTTONUP:
+                    self.scrollbar_grabbed = False
+
+                elif self.state == MENU:
+                    if event.type == pygame.KEYDOWN:
+                        if event.key in (pygame.K_1, pygame.K_2, pygame.K_3):
+                            lvl = ["EASY", "MEDIUM", "HARD"][event.key - pygame.K_1]
+                            self.reset_game(lvl)
+                        elif event.key == pygame.K_i:
+                            self.state = INSTRUCTIONS
+                            self.instruction_scroll_y = 0
+                        elif event.key == pygame.K_RETURN:
+                            self.state = PLAYING
+                            self.start_time = time.time()
+                    
+                    elif event.type == pygame.MOUSEBUTTONDOWN:
+                        w, h = self.screen.get_size()
+                        base_y = h//2 + 20
+                        options = ["EASY", "MEDIUM", "HARD", INSTRUCTIONS]
+                        
+                        for i, val in enumerate(options):
+                            y = base_y + i * 70
+                            rect = pygame.Rect(w//2 - 150, y - 30, 300, 60)
+                            if rect.collidepoint(event.pos):
+                                if val == INSTRUCTIONS:
+                                    self.state = INSTRUCTIONS
+                                    self.instruction_scroll_y = 0
+                                else:
+                                    self.reset_game(val)
+                                    self.state = PLAYING
+                                    self.start_time = time.time()
+
+                elif self.state == PLAYING and event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_g: self.show_graph = not self.show_graph
+                    elif event.key == pygame.K_h: self.show_heuristics = not self.show_heuristics
+                    elif event.key == pygame.K_a: self.show_annotations = not self.show_annotations
+                    elif event.key == pygame.K_r: self.reset_game(self.level)
+
+                elif self.state == GAME_OVER and event.type == pygame.KEYDOWN and event.key == pygame.K_RETURN:
+                    self.state = MENU
+
+                elif self.state == INSTRUCTIONS and event.type == pygame.KEYDOWN:
+                    if event.key in (pygame.K_ESCAPE, pygame.K_BACKSPACE):
+                        self.state = MENU
+
+            if self.scrollbar_grabbed and self.max_scroll > 0:
+                sb_h = self.screen.get_height() - 200
+                ratio = (mouse_pos[1] - 100) / sb_h
+                self.instruction_scroll_y = max(0, min(self.max_scroll, ratio * self.max_scroll))
+
+            # Rendering
+            if self.state == MENU:
+                self.draw_menu()
+            elif self.state == INSTRUCTIONS:
+                self.draw_instructions()
+            elif self.state == PLAYING:
+                self.handle_input()
+                self.elapsed_time = time.time() - self.start_time
+                if not self.ai.finished and int(self.elapsed_time * self.ai_speed) > self.ai.steps:
+                    self.ai.choose_move(self.maze)
+                    self.process_move(self.ai)
+                if self.player.finished and self.ai.finished:
+                    self.state = GAME_OVER
+
+                self.screen.fill(BG_PRIMARY)
+                self.draw_graph_overlay()
+                self.draw_grid()
+                self.draw_entities()
+                self.draw_hud()
+
+                w, h = self.screen.get_size()
+                if self.player.finished and not self.ai.finished:
+                    self.draw_text("Waiting for AI...", self.large_font, ACCENT_YELLOW, (w//2, h-80))
+                elif self.ai.finished and not self.player.finished:
+                    self.draw_text("AI Finished! Can you beat its score?", self.large_font, ACCENT_ORANGE, (w//2, h-80))
+
+            elif self.state == GAME_OVER:
+                self.screen.fill(BG_PRIMARY)
+                self.draw_grid()
+                self.draw_entities()
+                self.draw_game_over()
+
+            pygame.display.flip()
+
+        pygame.quit()
+        sys.exit()
+
+if __name__ == "__main__":
+    game = GameController()
+    game.run()
