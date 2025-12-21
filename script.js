@@ -163,19 +163,18 @@ class GreedyAI {
     constructor(startNode, goalNode) {
         this.currentNode = startNode;
         this.goalNode = goalNode;
-        this.path = [startNode];
+        this.path = [startNode]; // Visited nodes in order
+        this.pathSet = new Set([startNode]); // For fast lookup
+        this.stack = [startNode]; // For backtracking
         this.steps = 0;
         this.cost = 0;
         this.finished = false;
-        this.frontier = new PriorityQueue();
-        this.frontier.put(startNode, 0);
-        this.cameFrom = new Map();
-        this.cameFrom.set(startNode, null);
         this.nodesExplored = 0;
     }
 
     heuristic(a, b) {
-        return Math.abs(a.r - b.r) + Math.abs(a.c - b.c);
+        // Euclidean distance to match Python default
+        return Math.sqrt(Math.pow(a.r - b.r, 2) + Math.pow(a.c - b.c, 2));
     }
 
     chooseMove(maze) {
@@ -183,25 +182,52 @@ class GreedyAI {
 
         let neighbors = maze.getNeighbors(this.currentNode);
 
-        let best = null;
-        let minH = Infinity;
-
+        // Filter unvisited nodes (not in current path)
+        let candidates = [];
         for (let { node, cost } of neighbors) {
-            if (this.path.length > 1 && node === this.path[this.path.length - 2]) continue;
-
-            let h = this.heuristic(node, this.goalNode);
-            if (h < minH) {
-                minH = h;
-                best = { node, cost };
+            if (!this.pathSet.has(node)) {
+                candidates.push({ node, cost });
             }
         }
 
-        if (best) {
+        if (candidates.length > 0) {
+            // GREEDY CHOICE: Pick node with minimum heuristic
+            candidates.sort((a, b) => this.heuristic(a.node, this.goalNode) - this.heuristic(b.node, this.goalNode));
+            let best = candidates[0];
+
             this.currentNode = best.node;
             this.path.push(best.node);
+            this.pathSet.add(best.node);
+            this.stack.push(best.node);
             this.steps++;
             this.cost += best.cost;
+
             if (this.currentNode === this.goalNode) this.finished = true;
+        } else {
+            // Backtrack
+            if (this.stack.length > 1) {
+                this.stack.pop();
+                let backNode = this.stack[this.stack.length - 1];
+
+                this.currentNode = backNode;
+                this.steps++;
+                this.path.push(backNode);
+                // We don't remove from pathSet because we don't want to visit the dead end again immediately?
+                // Wait, Python code: candidates = [n for n in neighbors if n not in self.path]
+                // And self.path.append(back_node) on backtrack.
+                // So 'path' grows even when backtracking.
+                // So 'pathSet' should also keep the backtracked nodes?
+                // Yes, because we want to avoid loops.
+                // But if we backtrack, we are technically visiting a node again.
+                // The Python code: `candidates = [n ... if n not in self.path]`
+                // `self.path` contains ALL visited nodes including backtracks.
+                // So if we backtrack to node A, and then look for neighbors, 
+                // the neighbor we just came from (dead end) IS in `self.path`, so we won't go there again.
+                // Correct.
+            } else {
+                console.log("AI Stuck");
+                this.finished = true;
+            }
         }
     }
 }
