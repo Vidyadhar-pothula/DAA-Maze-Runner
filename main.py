@@ -111,8 +111,9 @@ class GameController:
                 "  A   : Toggle AI Annotations"
             ]),
             ("LEGEND", [
-                "S : Start | G : Goal",
-                "Red Circle : Trap (+3) | Green Circle : Power-Up (-2)",
+                "S : Start Node  |  G : Goal Node",
+                "Red Circle   : Trap (Cost +3)",
+                "Green Circle : Power-Up (Cost -2)",
                 "# : Wall"
             ])
         ]
