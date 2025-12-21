@@ -2,6 +2,7 @@ import pygame
 import sys
 import time
 import math
+import asyncio
 from game_classes import Maze, Player, GreedyAI
 
 # UI States
@@ -440,7 +441,7 @@ class GameController:
                 self.process_move(self.player)
                 self.last_move_time = now
 
-    def run(self):
+    async def run(self):
         running = True
         while running:
             self.clock.tick(FPS)
@@ -454,8 +455,19 @@ class GameController:
                 elif event.type == pygame.VIDEORESIZE:
                     self.screen = pygame.display.set_mode((event.w, event.h), pygame.RESIZABLE)
 
-                elif event.type == pygame.MOUSEWHEEL and self.state == INSTRUCTIONS:
-                    self.instruction_scroll_y = max(0, min(self.max_scroll, self.instruction_scroll_y - event.y * 40))
+                elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 4: # Scroll Up
+                    self.instruction_scroll_y = max(0, min(self.max_scroll, self.instruction_scroll_y - 40))
+                elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 5: # Scroll Down
+                    self.instruction_scroll_y = max(0, min(self.max_scroll, self.instruction_scroll_y + 40))
+                
+                elif event.type == pygame.MOUSEMOTION:
+                    if self.scrollbar_grabbed:
+                        sb_h = self.screen.get_height() - 200
+                        ratio = (event.pos[1] - 100) / sb_h
+                        self.instruction_scroll_y = max(0, min(self.max_scroll, ratio * self.max_scroll))
+                    elif self.state == INSTRUCTIONS:
+                        # Mouse wheel scrolling fallback
+                        pass
 
                 elif event.type == pygame.MOUSEBUTTONDOWN and self.state == INSTRUCTIONS and self.max_scroll > 0:
                     sb_x = self.screen.get_width() - 40
@@ -508,11 +520,6 @@ class GameController:
                     if event.key in (pygame.K_ESCAPE, pygame.K_BACKSPACE):
                         self.state = MENU
 
-            if self.scrollbar_grabbed and self.max_scroll > 0:
-                sb_h = self.screen.get_height() - 200
-                ratio = (mouse_pos[1] - 100) / sb_h
-                self.instruction_scroll_y = max(0, min(self.max_scroll, ratio * self.max_scroll))
-
             # Rendering
             if self.state == MENU:
                 self.draw_menu()
@@ -546,10 +553,11 @@ class GameController:
                 self.draw_game_over()
 
             pygame.display.flip()
+            await asyncio.sleep(0)
 
         pygame.quit()
-        sys.exit()
 
 if __name__ == "__main__":
+    import asyncio
     game = GameController()
-    game.run()
+    asyncio.run(game.run())
