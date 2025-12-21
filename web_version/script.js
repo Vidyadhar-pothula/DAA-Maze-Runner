@@ -126,6 +126,64 @@ class Maze {
         }
         return neighbors;
     }
+
+    bfsAnalysis() {
+        if (!this.goalNode) return;
+
+        this.bfsMap = new Map();
+        this.maxBfsDistance = 0;
+
+        let queue = [{ node: this.goalNode, dist: 0 }];
+        this.bfsMap.set(this.goalNode, 0);
+
+        while (queue.length > 0) {
+            let { node, dist } = queue.shift();
+            this.maxBfsDistance = Math.max(this.maxBfsDistance, dist);
+
+            let neighbors = this.getNeighbors(node);
+            for (let { node: neighbor } of neighbors) {
+                if (!this.bfsMap.has(neighbor)) {
+                    this.bfsMap.set(neighbor, dist + 1);
+                    queue.push({ node: neighbor, dist: dist + 1 });
+                }
+            }
+        }
+    }
+
+    aStarOptimal() {
+        if (!this.startNode || !this.goalNode) return 0;
+
+        let frontier = new PriorityQueue();
+        frontier.put(this.startNode, 0);
+
+        let costSoFar = new Map();
+        costSoFar.set(this.startNode, 0);
+
+        while (!frontier.isEmpty()) {
+            let current = frontier.get();
+
+            if (current === this.goalNode) break;
+
+            let neighbors = this.getNeighbors(current);
+            for (let { node, cost } of neighbors) {
+                // IMPORTANT: Ensure non-negative weights for A* stability
+                let actualMoveCost = Math.max(0, cost);
+                let newCost = costSoFar.get(current) + actualMoveCost;
+
+                if (!costSoFar.has(node) || newCost < costSoFar.get(node)) {
+                    costSoFar.set(node, newCost);
+                    let priority = newCost + this.heuristic(node, this.goalNode);
+                    frontier.put(node, priority);
+                }
+            }
+        }
+
+        return costSoFar.get(this.goalNode) || 0;
+    }
+
+    heuristic(a, b) {
+        return Math.sqrt(Math.pow(a.r - b.r, 2) + Math.pow(a.c - b.c, 2));
+    }
 }
 
 class Player {
@@ -170,6 +228,7 @@ class GreedyAI {
         this.steps = 0;
         this.cost = 0;
         this.finished = false;
+        this.actionLog = "";
 
         this.computePath();
     }
@@ -232,6 +291,10 @@ class GreedyAI {
             }
             let penalty = nextNode.type === 'TRAP' ? 3 : nextNode.type === 'POWERUP' ? -2 : 0;
 
+            if (penalty === 3) this.actionLog += "T";
+            else if (penalty === -2) this.actionLog += "P";
+            else this.actionLog += "M";
+
             this.currentNode = nextNode;
             this.path.push(nextNode);
             this.steps++;
@@ -240,6 +303,71 @@ class GreedyAI {
 
             if (this.currentNode === this.goalNode) this.finished = true;
         }
+    }
+}
+
+class HuffmanNode {
+    constructor(char, freq, left = null, right = null) {
+        this.char = char;
+        this.freq = freq;
+        this.left = left;
+        this.right = right;
+    }
+}
+
+class Huffman {
+    constructor() {
+        this.codes = {};
+    }
+
+    buildTree(text) {
+        if (!text || text.length === 0) return null;
+
+        const freqs = {};
+        for (let char of text) {
+            freqs[char] = (freqs[char] || 0) + 1;
+        }
+
+        const pq = new PriorityQueue();
+        for (let char in freqs) {
+            pq.put(new HuffmanNode(char, freqs[char]), freqs[char]);
+        }
+
+        while (pq.elements.length > 1) {
+            let left = pq.get();
+            let right = pq.get();
+            let parent = new HuffmanNode(null, left.freq + right.freq, left, right);
+            pq.put(parent, parent.freq);
+        }
+
+        let root = pq.get();
+        this.generateCodes(root, "");
+        return root;
+    }
+
+    generateCodes(node, code) {
+        if (!node) return;
+        if (!node.left && !node.right) {
+            this.codes[node.char] = code;
+            return;
+        }
+        this.generateCodes(node.left, code + "0");
+        this.generateCodes(node.right, code + "1");
+    }
+
+    encode(text) {
+        this.codes = {};
+        this.buildTree(text);
+        return text.split('').map(c => this.codes[c]).join('');
+    }
+
+    getStats(text) {
+        if (!text) return { originalBits: 0, compressedBits: 0, ratio: 0 };
+        let encoded = this.encode(text);
+        let originalBits = text.length * 8;
+        let compressedBits = encoded.length;
+        let ratio = originalBits > 0 ? ((1 - compressedBits / originalBits) * 100) : 0;
+        return { originalBits, compressedBits, ratio: ratio.toFixed(1) };
     }
 }
 
@@ -371,9 +499,9 @@ function draw() {
             } else if (cell.type === 'FLOOR') {
                 ctx.fillStyle = COLORS.floor;
                 // BFS Visualization
-                if (showBFS && maze.bfsMap.has(cell)) {
+                if (showBFS && maze.bfsMap && maze.bfsMap.has(cell)) {
                     let dist = maze.bfsMap.get(cell);
-                    let intensity = 1 - (dist / maze.maxBfsDistance);
+                    let intensity = maze.maxBfsDistance > 0 ? 1 - (dist / maze.maxBfsDistance) : 1;
                     ctx.fillStyle = `rgba(0, 255, 255, ${intensity * 0.5})`;
                 }
                 ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);

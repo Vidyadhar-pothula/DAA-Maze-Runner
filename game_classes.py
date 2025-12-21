@@ -1,6 +1,23 @@
 import math
 import random
 from collections import deque
+import heapq
+
+class PriorityQueue:
+    def __init__(self):
+        self.elements = []
+        self.count = 0 
+    
+    def empty(self):
+        return len(self.elements) == 0
+    
+    def put(self, item, priority):
+        # Use count as tie-breaker to avoid comparing items directly if priorities match
+        heapq.heappush(self.elements, (priority, self.count, item))
+        self.count += 1
+    
+    def get(self):
+        return heapq.heappop(self.elements)[2]
 
 # game_classes.py
 
@@ -318,7 +335,9 @@ class Maze:
                 if neighbor.type == 'T': penalty = 3
                 elif neighbor.type == 'P': penalty = -2
                 
-                new_cost = cost_so_far[current] + edge_cost + penalty
+                # IMPORTANT: Ensure total weight is non-negative for A* stability
+                actual_move_cost = max(0, edge_cost + penalty)
+                new_cost = cost_so_far[current] + actual_move_cost
                 
                 if neighbor not in cost_so_far or new_cost < cost_so_far[neighbor]:
                     cost_so_far[neighbor] = new_cost
@@ -361,20 +380,9 @@ class Player:
         return False
 
 
-import heapq
 
-class PriorityQueue:
-    def __init__(self):
-        self.elements = []
-    
-    def empty(self):
-        return len(self.elements) == 0
-    
-    def put(self, item, priority):
-        heapq.heappush(self.elements, (priority, item))
-    
-    def get(self):
-        return heapq.heappop(self.elements)[1]
+
+
 
 class HuffmanNode:
     def __init__(self, char, freq, left=None, right=None):
@@ -485,6 +493,7 @@ class GreedyAI:
             self.full_path = path
         else:
             print("No path found for AI")
+            self.finished = True # Prevent infinite wait
 
     def choose_move(self, maze):
         if self.finished: return
@@ -514,6 +523,9 @@ class GreedyAI:
             
             if self.current_node == self.goal_node:
                 self.finished = True
+        else:
+            # End of path but not at goal (should be handled by compute_path check, but safety fallback)
+            self.finished = True
     
     def get_efficiency_vs_optimal(self, optimal_cost):
         if self.total_cost == 0: return 0

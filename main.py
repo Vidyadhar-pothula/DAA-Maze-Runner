@@ -247,8 +247,8 @@ class GameController:
                     # BFS Visualization
                     if self.show_bfs and hasattr(self.maze, 'bfs_map') and node in self.maze.bfs_map:
                         dist = self.maze.bfs_map[node]
-                        max_dist = self.maze.max_bfs_distance if self.maze.max_bfs_distance > 0 else 1
-                        intensity = 1 - (dist / max_dist)
+                        max_dist = self.maze.max_bfs_distance
+                        intensity = 1 - (dist / max_dist) if max_dist > 0 else 1
                         intensity = max(0.0, min(1.0, intensity)) # Clamp
                         
                         # Cyan gradient

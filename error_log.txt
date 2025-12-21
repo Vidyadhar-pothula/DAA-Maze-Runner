@@ -1,0 +1,8 @@
+Traceback (most recent call last):
+  File "d:\Desktop\PythonCorner\DAA-Maze-Runner\main.py", line 615, in <module>
+    game.run()
+  File "d:\Desktop\PythonCorner\DAA-Maze-Runner\main.py", line 609, in run
+    sys.exit()
+SystemExit
+
+Exception: 
