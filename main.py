@@ -365,16 +365,22 @@ class GameController:
         a_win = self.ai.current_node == self.maze.goal_node
 
         if p_win and not a_win:
-            result, col = "VICTORY!", ACCENT_GREEN
+            result, col = "VICTORY! (Reached Goal First)", ACCENT_GREEN
         elif a_win and not p_win:
-            result, col = "AI WINS!", ACCENT_ORANGE
+            result, col = "AI WINS! (Reached Goal First)", ACCENT_ORANGE
         elif p_win and a_win:
             if self.player.total_cost < self.ai.total_cost:
                 result, col = "YOU WIN! (Lower Cost)", ACCENT_GREEN
             elif self.ai.total_cost < self.player.total_cost:
                 result, col = "AI WINS! (Lower Cost)", ACCENT_ORANGE
             else:
-                result, col = "DRAW!", ACCENT_BLUE
+                # Tiebreaker: Steps
+                if self.player.steps < self.ai.steps:
+                    result, col = "YOU WIN! (Fewer Steps)", ACCENT_GREEN
+                elif self.ai.steps < self.player.steps:
+                    result, col = "AI WINS! (Fewer Steps)", ACCENT_ORANGE
+                else:
+                    result, col = "DRAW!", ACCENT_BLUE
         else:
             result, col = "NO ONE REACHED GOAL", TEXT_SUB
 
