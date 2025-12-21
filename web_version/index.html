@@ -75,8 +75,15 @@
                 <p>Your Cost: <span id="go-p-cost">0</span> | AI Cost: <span id="go-ai-cost">0</span></p>
                 <p>Your Steps: <span id="go-p-steps">0</span> | AI Steps: <span id="go-ai-steps">0</span></p>
             </div>
+            <div id="algo-stats" class="stats-box" style="margin-top: 10px; font-size: 0.9em; text-align: left;">
+                <!-- Stats will be injected here -->
+            </div>
             <button onclick="showMenu()">MENU</button>
         </div>
+
+        <button id="toggle-bfs-btn" onclick="toggleBFS()"
+            style="position: absolute; bottom: 20px; right: 20px; padding: 10px; font-size: 12px; opacity: 0.7;">Toggle
+            BFS Map (B)</button>
 
         <div id="blackout-overlay" class="overlay hidden" style="background-color: #000; z-index: 200;"></div>
     </div>
