@@ -279,7 +279,7 @@ function startGame(lvl) {
         canvas.height = size * TILE_SIZE;
 
         player = new Player(maze.startNode);
-        ai = new GreedyAI(maze.startNode, maze.goalNode);
+        ai = new GreedyAI(maze.startNode, maze.goalNode, maze);
 
         gameState = 'PLAYING';
         startTime = Date.now();
