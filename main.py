@@ -93,9 +93,21 @@ class GameController:
                 "Collect Power-Ups (-2 cost) and avoid Traps (+3 cost)."
             ]),
             ("CONTROLS", [
-                "WASD / Arrows : Move",
-                "Q, E, Z, C : Diagonals",
-                "G : Toggle Graph | H : Heuristics | A : Annotations"
+                "MOVEMENT:",
+                "  W / Up Arrow    : Move Up",
+                "  S / Down Arrow  : Move Down",
+                "  A / Left Arrow  : Move Left",
+                "  D / Right Arrow : Move Right",
+                "",
+                "DIAGONALS:",
+                "  Q : Up-Left   |  E : Up-Right",
+                "  Z : Down-Left |  C : Down-Right",
+                "",
+                "SYSTEM:",
+                "  R : Restart Level",
+                "  G : Toggle Graph Overlay",
+                "  H : Toggle Heuristics",
+                "  A : Toggle AI Annotations"
             ]),
             ("LEGEND", [
                 "S : Start | G : Goal",
