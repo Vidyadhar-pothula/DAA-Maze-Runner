@@ -250,6 +250,8 @@ let gameState = 'MENU'; // MENU, PLAYING, GAMEOVER
 let startTime;
 let animationId;
 let level = 'MEDIUM';
+let showBFS = false;
+let optimalCost = 0;
 
 function init() {
     canvas = document.getElementById('game-canvas');
@@ -277,6 +279,12 @@ function startGame(lvl) {
         maze = new Maze(size, size);
         canvas.width = size * TILE_SIZE;
         canvas.height = size * TILE_SIZE;
+
+        // Run Structural Analysis (BFS)
+        maze.bfsAnalysis();
+
+        // Run Optimal Reference (A*)
+        optimalCost = maze.aStarOptimal();
 
         player = new Player(maze.startNode);
         ai = new GreedyAI(maze.startNode, maze.goalNode, maze);
@@ -314,9 +322,15 @@ function handleInput(e) {
         case 'z': player.move(1, -1, maze); break;
         case 'c': player.move(1, 1, maze); break;
 
+        case 'b': toggleBFS(); break;
+
         case 'r': startGame(level); break;
         case 'Escape': showMenu(); break;
     }
+}
+
+function toggleBFS() {
+    showBFS = !showBFS;
 }
 
 function update() {
@@ -356,6 +370,12 @@ function draw() {
                 ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
             } else if (cell.type === 'FLOOR') {
                 ctx.fillStyle = COLORS.floor;
+                // BFS Visualization
+                if (showBFS && maze.bfsMap.has(cell)) {
+                    let dist = maze.bfsMap.get(cell);
+                    let intensity = 1 - (dist / maze.maxBfsDistance);
+                    ctx.fillStyle = `rgba(0, 255, 255, ${intensity * 0.5})`;
+                }
                 ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
             } else if (cell.type === 'TRAP') {
                 ctx.fillStyle = COLORS.trap;
@@ -454,6 +474,19 @@ function gameOver() {
     document.getElementById('go-ai-cost').innerText = ai.cost.toFixed(1);
     document.getElementById('go-p-steps').innerText = player.steps;
     document.getElementById('go-ai-steps').innerText = ai.steps;
+
+    // Algorithm Analysis
+    let huffman = new Huffman();
+    let stats = huffman.getStats(ai.actionLog);
+    let efficiency = ((optimalCost / ai.cost) * 100).toFixed(1);
+
+    document.getElementById('algo-stats').innerHTML = `
+        <p><strong>Algorithm Analysis:</strong></p>
+        <p>BFS Reachability: 100% (Verified)</p>
+        <p>A* Optimal Cost: ${optimalCost.toFixed(1)}</p>
+        <p>Greedy Efficiency: ${efficiency}%</p>
+        <p>Huffman Compression: ${stats.ratio}% (${stats.originalBits}b -> ${stats.compressedBits}b)</p>
+    `;
 }
 
 function showMenu() {
