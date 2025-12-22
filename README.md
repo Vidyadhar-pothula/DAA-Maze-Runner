@@ -1,6 +1,6 @@
 # DAA Maze Runner - Enhanced Graph Visualization
 
-**Ind# Duel of Labyrinth
+# Duel of Labyrinth
 
 [![Play Online](https://img.shields.io/badge/Play-Online-green?style=for-the-badge&logo=google-chrome)](https://vidyadhar-pothula.github.io/DAA-Maze-Runner/)
 
