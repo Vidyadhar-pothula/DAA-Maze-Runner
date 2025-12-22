@@ -401,34 +401,40 @@ function startGame(lvl) {
 
     // 3. Wait 1 second
     setTimeout(() => {
-        level = lvl;
-        let size = lvl === 'EASY' ? 15 : lvl === 'MEDIUM' ? 21 : 31;
-        maze = new Maze(size, size);
-        canvas.width = size * TILE_SIZE;
-        canvas.height = size * TILE_SIZE;
+        try {
+            level = lvl;
+            let size = lvl === 'EASY' ? 15 : lvl === 'MEDIUM' ? 21 : 31;
+            maze = new Maze(size, size);
+            canvas.width = size * TILE_SIZE;
+            canvas.height = size * TILE_SIZE;
 
-        // Run Structural Analysis (BFS)
-        maze.bfsAnalysis();
+            // Run Structural Analysis (BFS)
+            maze.bfsAnalysis();
 
-        // Run Optimal Reference (A*)
-        optimalCost = maze.aStarOptimal();
+            // Run Optimal Reference (A*)
+            optimalCost = maze.aStarOptimal();
 
-        player = new Player(maze.startNode);
-        ai = new GreedyAI(maze.startNode, maze.goalNode, maze);
+            player = new Player(maze.startNode);
+            ai = new GreedyAI(maze.startNode, maze.goalNode, maze);
 
-        gameState = 'PLAYING';
-        startTime = Date.now();
+            gameState = 'PLAYING';
+            startTime = Date.now();
 
-        document.getElementById('game-over-overlay').classList.add('hidden');
-        document.getElementById('level-display').innerText = lvl;
+            document.getElementById('game-over-overlay').classList.add('hidden');
+            document.getElementById('level-display').innerText = lvl;
 
-        // 4. Fade out blackout
-        blackout.style.opacity = '0';
-        setTimeout(() => {
-            blackout.classList.add('hidden');
-        }, 500); // Wait for fade out
+            // 4. Fade out blackout
+            blackout.style.opacity = '0';
+            setTimeout(() => {
+                blackout.classList.add('hidden');
+            }, 500); // Wait for fade out
 
-        gameLoop();
+            gameLoop();
+        } catch (e) {
+            console.error(e);
+            alert("Game Error: " + e.message + "\n" + e.stack);
+            showMenu();
+        }
     }, 1000);
 }
 
