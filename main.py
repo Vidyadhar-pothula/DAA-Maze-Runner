@@ -209,6 +209,7 @@ class GameController:
         self.show_heuristics = False
         self.show_graph = False
         self.show_visited = False
+        self.show_huffman = False
         self.record_frame()
 
     def record_frame(self):
@@ -586,7 +587,46 @@ class GameController:
         pygame.draw.rect(self.screen, ACCENT_BLUE, (20, h-60, bar_w * progress, 10))
         
         self.draw_text(f"REPLAY | Frame: {self.replay_index}/{len(self.history)-1} | Speed: {self.replay_speed}x", self.small_font, TEXT_MAIN, (w//2, h-35))
-        self.draw_text("Space: Pause | Arrows: Seek | V: AI Logic (Visited) | G: Graph | B: BFS | H: Path", self.small_font, TEXT_SUB, (w//2, h-15))
+        self.draw_text("Space: Pause | Arrows: Seek | V: Visited | C: Huffman | G: Graph | B: BFS | H: Path", self.small_font, TEXT_SUB, (w//2, h-15))
+
+        # 5. Huffman Overlay
+        if self.show_huffman:
+            overlay = pygame.Surface((w - 100, 250), pygame.SRCALPHA)
+            overlay.fill((20, 20, 30, 230)) # Dark semi-transparent
+            pygame.draw.rect(overlay, ACCENT_CYAN, overlay.get_rect(), 2) # Border
+            
+            ox, oy = 50, h//2 - 125
+            self.screen.blit(overlay, (ox, oy))
+            
+            # Title
+            self.draw_text("HUFFMAN CODING ANALYSIS", self.medium_font, ACCENT_CYAN, (w//2, oy + 30))
+            
+            # Explanation
+            expl = "Huffman coding compresses the AI's action log by assigning shorter binary codes to more frequent moves."
+            self.draw_text(expl, self.small_font, TEXT_MAIN, (w//2, oy + 60))
+            
+            # Stats
+            # Reconstruct action log up to current frame
+            # Since we don't store partial logs, we'll estimate from full log or just show full log stats
+            # For simplicity and accuracy, let's show the FULL GAME stats as "Post-Game Analysis"
+            
+            full_log = self.ai.action_log
+            if full_log:
+                huff = Huffman()
+                root = huff.build_tree(full_log)
+                codes = huff.codes
+                encoded = huff.encode(full_log, codes)
+                
+                original_bits = len(full_log) * 8
+                compressed_bits = len(encoded)
+                ratio = (1 - compressed_bits/original_bits) * 100
+                
+                self.draw_text(f"Action Log: {full_log[:30]}..." if len(full_log) > 30 else f"Action Log: {full_log}", self.small_font, ACCENT_ORANGE, (w//2, oy + 100))
+                self.draw_text(f"Original Size: {original_bits} bits", self.small_font, TEXT_SUB, (w//2, oy + 130))
+                self.draw_text(f"Compressed Size: {compressed_bits} bits", self.small_font, ACCENT_GREEN, (w//2, oy + 150))
+                self.draw_text(f"Compression Ratio: {ratio:.2f}%", self.medium_font, ACCENT_GREEN, (w//2, oy + 190))
+            else:
+                self.draw_text("No Action Log Available (AI didn't move?)", self.small_font, TEXT_SUB, (w//2, oy + 100))
 
     def process_move(self, agent):
         node = agent.current_node
@@ -706,7 +746,7 @@ class GameController:
                         self.map_mode = 2 # Default to Greedy Map for visualization
                         self.show_heuristics = True # Show path lines
                         self.show_graph = True # Show Graph Nodes/Edges
-                        self.show_visited = True # Show visited by default for "AI Logic"
+                        self.show_visited = False # Show visited by default for "AI Logic"
 
                 elif self.state == REPLAY and event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_ESCAPE: self.state = MENU
@@ -722,6 +762,7 @@ class GameController:
                     elif event.key == pygame.K_h: self.show_heuristics = not self.show_heuristics
                     elif event.key == pygame.K_g: self.show_graph = not self.show_graph # Graph Toggle
                     elif event.key == pygame.K_v: self.show_visited = not self.show_visited # Visited Toggle
+                    elif event.key == pygame.K_c: self.show_huffman = not self.show_huffman # Huffman Toggle
 
                 elif self.state == INSTRUCTIONS and event.type == pygame.KEYDOWN:
                     if event.key in (pygame.K_ESCAPE, pygame.K_BACKSPACE):
