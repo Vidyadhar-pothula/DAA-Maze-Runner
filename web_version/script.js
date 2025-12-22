@@ -449,6 +449,7 @@ function startGame(lvl) {
         document.getElementById('blackout-overlay').classList.remove('hidden');
         document.getElementById('blackout-overlay').style.opacity = '1';
 
+        // 1 Second Transition
         setTimeout(() => {
             try {
                 maze = new Maze(size, size);
@@ -475,7 +476,7 @@ function startGame(lvl) {
                 alert("Error starting game: " + e.message);
                 showMenu();
             }
-        }, 500); // Short delay for transition
+        }, 1000); // 1 Second Delay
     } catch (e) {
         console.error(e);
         alert("Critical Error: " + e.message);
