@@ -178,6 +178,10 @@ class Maze {
         }
         return costSoFar.get(this.goalNode) || 0;
     }
+
+    heuristic(a, b) {
+        return Math.sqrt(Math.pow(a.r - b.r, 2) + Math.pow(a.c - b.c, 2));
+    }
 }
 
 class Player {
