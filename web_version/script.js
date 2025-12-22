@@ -436,6 +436,7 @@ function resizeCanvas() {
 }
 
 function startGame(lvl) {
+    console.log("Starting game level:", lvl);
     try {
         level = lvl;
         let size = lvl === 'EASY' ? 15 : lvl === 'MEDIUM' ? 21 : 31;
@@ -451,13 +452,21 @@ function startGame(lvl) {
 
         // 1 Second Transition
         setTimeout(() => {
+            console.log("Transition complete. Initializing game objects...");
             try {
+                console.log("Generating Maze...");
                 maze = new Maze(size, size);
+                console.log("Maze generated. Running BFS Analysis...");
                 maze.bfsAnalysis();
+                console.log("BFS Analysis complete. Running A* Optimal...");
                 optimalCost = maze.aStarOptimal();
+                console.log("A* complete. Cost:", optimalCost);
 
+                console.log("Creating Player...");
                 player = new Player(maze.startNode);
+                console.log("Creating AI...");
                 ai = new GreedyAI(maze.startNode, maze.goalNode, maze);
+                console.log("AI Created.");
 
                 gameState = 'PLAYING';
                 startTime = Date.now();
@@ -466,19 +475,21 @@ function startGame(lvl) {
                 document.getElementById('level-display').innerText = lvl;
 
                 // Fade out blackout
+                console.log("Fading out blackout...");
                 let blackout = document.getElementById('blackout-overlay');
                 blackout.style.opacity = '0';
                 setTimeout(() => blackout.classList.add('hidden'), 500);
 
+                console.log("Starting Game Loop...");
                 gameLoop();
             } catch (e) {
-                console.error(e);
+                console.error("Error in startGame inner block:", e);
                 alert("Error starting game: " + e.message);
                 showMenu();
             }
         }, 1000); // 1 Second Delay
     } catch (e) {
-        console.error(e);
+        console.error("Error in startGame outer block:", e);
         alert("Critical Error: " + e.message);
     }
 }
@@ -507,127 +518,145 @@ function handleInput(e) {
 function update() {
     if (gameState !== 'PLAYING') return;
 
-    // AI Move (throttled based on level)
-    let speed = level === 'EASY' ? 10 : level === 'MEDIUM' ? 5 : 2; // Frames per move
-    let elapsedSec = (Date.now() - startTime) / 1000;
+    try {
+        // AI Move (throttled based on level)
+        let speed = level === 'EASY' ? 10 : level === 'MEDIUM' ? 5 : 2; // Frames per move
+        let elapsedSec = (Date.now() - startTime) / 1000;
 
-    // Simple speed control: move every X ms
-    let moveInterval = level === 'EASY' ? 500 : level === 'MEDIUM' ? 300 : 150;
+        // Simple speed control: move every X ms
+        let moveInterval = level === 'EASY' ? 500 : level === 'MEDIUM' ? 300 : 150;
 
-    if (Math.floor((Date.now() - startTime) / moveInterval) > ai.steps) {
-        ai.chooseMove(maze);
+        if (Math.floor((Date.now() - startTime) / moveInterval) > ai.steps) {
+            ai.chooseMove(maze);
+        }
+
+        // Check Win
+        if (player.finished && ai.finished) {
+            gameOver();
+        }
+
+        // Update HUD
+        document.getElementById('time-display').innerText = elapsedSec.toFixed(1);
+        document.getElementById('p-steps').innerText = player.steps;
+        document.getElementById('p-cost').innerText = player.cost.toFixed(1);
+        document.getElementById('ai-steps').innerText = ai.steps;
+        document.getElementById('ai-cost').innerText = ai.cost.toFixed(1);
+    } catch (e) {
+        console.error("Error in update:", e);
     }
-
-    // Check Win
-    if (player.finished && ai.finished) {
-        gameOver();
-    }
-
-    // Update HUD
-    document.getElementById('time-display').innerText = elapsedSec.toFixed(1);
-    document.getElementById('p-steps').innerText = player.steps;
-    document.getElementById('p-cost').innerText = player.cost.toFixed(1);
-    document.getElementById('ai-steps').innerText = ai.steps;
-    document.getElementById('ai-cost').innerText = ai.cost.toFixed(1);
 }
 
 function draw() {
-    // Clear
-    ctx.fillStyle = COLORS.bg;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    try {
+        // Clear
+        ctx.fillStyle = COLORS.bg;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Draw Maze
-    for (let r = 0; r < maze.rows; r++) {
-        for (let c = 0; c < maze.cols; c++) {
-            let cell = maze.grid[r][c];
-            let x = c * TILE_SIZE;
-            let y = r * TILE_SIZE;
+        if (!maze) return; // Safety check
 
-            if (cell.type === 'WALL') {
-                ctx.fillStyle = COLORS.wall;
-                ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
-            } else {
-                ctx.fillStyle = COLORS.floor;
-                // BFS Visualization
-                if (showBFS && maze.bfsMap && maze.bfsMap.has(cell)) {
-                    let dist = maze.bfsMap.get(cell);
-                    let intensity = maze.maxBfsDistance > 0 ? 1 - (dist / maze.maxBfsDistance) : 1;
-                    ctx.fillStyle = `rgba(0, 255, 255, ${intensity * 0.5})`;
+        // Draw Maze
+        for (let r = 0; r < maze.rows; r++) {
+            for (let c = 0; c < maze.cols; c++) {
+                let cell = maze.grid[r][c];
+                let x = c * TILE_SIZE;
+                let y = r * TILE_SIZE;
+
+                if (cell.type === 'WALL') {
+                    ctx.fillStyle = COLORS.wall;
+                    ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+                } else {
+                    ctx.fillStyle = COLORS.floor;
+                    // BFS Visualization
+                    if (showBFS && maze.bfsMap && maze.bfsMap.has(cell)) {
+                        let dist = maze.bfsMap.get(cell);
+                        let intensity = maze.maxBfsDistance > 0 ? 1 - (dist / maze.maxBfsDistance) : 1;
+                        ctx.fillStyle = `rgba(0, 255, 255, ${intensity * 0.5})`;
+                    }
+                    ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+
+                    // Grid lines
+                    ctx.strokeStyle = '#2A2A3A';
+                    ctx.lineWidth = 1;
+                    ctx.strokeRect(x, y, TILE_SIZE, TILE_SIZE);
                 }
-                ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
 
-                // Grid lines
-                ctx.strokeStyle = '#2A2A3A';
-                ctx.lineWidth = 1;
-                ctx.strokeRect(x, y, TILE_SIZE, TILE_SIZE);
-            }
-
-            if (cell.type === 'TRAP') {
-                ctx.fillStyle = COLORS.trap;
-                ctx.beginPath();
-                ctx.arc(x + TILE_SIZE / 2, y + TILE_SIZE / 2, TILE_SIZE / 4, 0, Math.PI * 2);
-                ctx.fill();
-            } else if (cell.type === 'POWERUP') {
-                ctx.fillStyle = COLORS.powerup;
-                ctx.beginPath();
-                ctx.arc(x + TILE_SIZE / 2, y + TILE_SIZE / 2, TILE_SIZE / 4, 0, Math.PI * 2);
-                ctx.fill();
+                if (cell.type === 'TRAP') {
+                    ctx.fillStyle = COLORS.trap;
+                    ctx.beginPath();
+                    ctx.arc(x + TILE_SIZE / 2, y + TILE_SIZE / 2, TILE_SIZE / 4, 0, Math.PI * 2);
+                    ctx.fill();
+                } else if (cell.type === 'POWERUP') {
+                    ctx.fillStyle = COLORS.powerup;
+                    ctx.beginPath();
+                    ctx.arc(x + TILE_SIZE / 2, y + TILE_SIZE / 2, TILE_SIZE / 4, 0, Math.PI * 2);
+                    ctx.fill();
+                }
             }
         }
-    }
 
-    // Draw Start/Goal
-    ctx.font = 'bold 20px Arial';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
+        // Draw Start/Goal
+        if (maze.startNode) {
+            ctx.font = 'bold 20px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
 
-    let sx = maze.startNode.c * TILE_SIZE + TILE_SIZE / 2;
-    let sy = maze.startNode.r * TILE_SIZE + TILE_SIZE / 2;
-    ctx.fillStyle = COLORS.powerup;
-    ctx.fillText('S', sx, sy);
-
-    let gx = maze.goalNode.c * TILE_SIZE + TILE_SIZE / 2;
-    let gy = maze.goalNode.r * TILE_SIZE + TILE_SIZE / 2;
-    ctx.fillStyle = COLORS.ai; // Purple/Orange for Goal
-    ctx.fillText('G', gx, gy);
-
-    // Draw Trails
-    if (player.path.length > 1) {
-        ctx.strokeStyle = COLORS.path;
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.moveTo(player.path[0].c * TILE_SIZE + TILE_SIZE / 2, player.path[0].r * TILE_SIZE + TILE_SIZE / 2);
-        for (let node of player.path) {
-            ctx.lineTo(node.c * TILE_SIZE + TILE_SIZE / 2, node.r * TILE_SIZE + TILE_SIZE / 2);
+            let sx = maze.startNode.c * TILE_SIZE + TILE_SIZE / 2;
+            let sy = maze.startNode.r * TILE_SIZE + TILE_SIZE / 2;
+            ctx.fillStyle = COLORS.powerup;
+            ctx.fillText('S', sx, sy);
         }
-        ctx.stroke();
-    }
 
-    if (ai.path.length > 1) {
-        ctx.strokeStyle = COLORS.aiPath;
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(ai.path[0].c * TILE_SIZE + TILE_SIZE / 2, ai.path[0].r * TILE_SIZE + TILE_SIZE / 2);
-        for (let node of ai.path) {
-            ctx.lineTo(node.c * TILE_SIZE + TILE_SIZE / 2, node.r * TILE_SIZE + TILE_SIZE / 2);
+        if (maze.goalNode) {
+            let gx = maze.goalNode.c * TILE_SIZE + TILE_SIZE / 2;
+            let gy = maze.goalNode.r * TILE_SIZE + TILE_SIZE / 2;
+            ctx.fillStyle = COLORS.ai; // Purple/Orange for Goal
+            ctx.fillText('G', gx, gy);
         }
-        ctx.stroke();
+
+        // Draw Trails
+        if (player && player.path.length > 1) {
+            ctx.strokeStyle = COLORS.path;
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(player.path[0].c * TILE_SIZE + TILE_SIZE / 2, player.path[0].r * TILE_SIZE + TILE_SIZE / 2);
+            for (let node of player.path) {
+                ctx.lineTo(node.c * TILE_SIZE + TILE_SIZE / 2, node.r * TILE_SIZE + TILE_SIZE / 2);
+            }
+            ctx.stroke();
+        }
+
+        if (ai && ai.path.length > 1) {
+            ctx.strokeStyle = COLORS.aiPath;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(ai.path[0].c * TILE_SIZE + TILE_SIZE / 2, ai.path[0].r * TILE_SIZE + TILE_SIZE / 2);
+            for (let node of ai.path) {
+                ctx.lineTo(node.c * TILE_SIZE + TILE_SIZE / 2, node.r * TILE_SIZE + TILE_SIZE / 2);
+            }
+            ctx.stroke();
+        }
+
+        // Draw Player
+        if (player && player.currentNode) {
+            ctx.fillStyle = COLORS.player;
+            ctx.beginPath();
+            ctx.arc(player.currentNode.c * TILE_SIZE + TILE_SIZE / 2, player.currentNode.r * TILE_SIZE + TILE_SIZE / 2, TILE_SIZE / 3, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#FFF';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        }
+
+        // Draw AI
+        if (ai && ai.currentNode) {
+            ctx.fillStyle = COLORS.ai;
+            ctx.beginPath();
+            ctx.arc(ai.currentNode.c * TILE_SIZE + TILE_SIZE / 2, ai.currentNode.r * TILE_SIZE + TILE_SIZE / 2, TILE_SIZE / 3, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    } catch (e) {
+        console.error("Error in draw:", e);
     }
-
-    // Draw Player
-    ctx.fillStyle = COLORS.player;
-    ctx.beginPath();
-    ctx.arc(player.currentNode.c * TILE_SIZE + TILE_SIZE / 2, player.currentNode.r * TILE_SIZE + TILE_SIZE / 2, TILE_SIZE / 3, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = '#FFF';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    // Draw AI
-    ctx.fillStyle = COLORS.ai;
-    ctx.beginPath();
-    ctx.arc(ai.currentNode.c * TILE_SIZE + TILE_SIZE / 2, ai.currentNode.r * TILE_SIZE + TILE_SIZE / 2, TILE_SIZE / 3, 0, Math.PI * 2);
-    ctx.fill();
 }
 
 function gameLoop() {
