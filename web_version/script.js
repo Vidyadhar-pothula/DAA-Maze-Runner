@@ -1,20 +1,20 @@
 const TILE_SIZE = 30;
 const FPS = 60;
 
-// Colors (Modern Dark Theme)
+// Colors (Neon Cyberpunk Theme)
 const COLORS = {
-    bg: '#1E1E2E',       // Deep Blue-Grey
-    wall: '#41415A',     // Lighter for Walls
-    floor: '#14141E',    // Darker floor
-    player: '#89B4FA',   // Soft Blue
-    ai: '#FAB387',       // Soft Orange
-    trap: '#F38BA8',     // Soft Red
-    powerup: '#A6E3A1',  // Mint Green
-    path: '#89B4FA',     // Player Path
-    aiPath: '#FAB387',   // AI Path
-    text: '#CDD6F4',     // Off-white
-    bfs: 'rgba(0, 255, 255, 0.3)', // Cyan for BFS
-    greedy: 'rgba(255, 0, 255, 0.3)' // Magenta for Greedy
+    bg: '#050510',       // Void Black
+    wall: '#2a2a40',     // Dark Blue-Grey
+    floor: '#0a0a12',    // Near Black
+    player: '#00ff9d',   // Neon Mint
+    ai: '#ff0055',       // Neon Pink
+    trap: '#ff3300',     // Neon Red
+    powerup: '#ccff00',  // Neon Lime
+    path: '#00ff9d',     // Player Path (Mint)
+    aiPath: '#ff0055',   // AI Path (Pink)
+    text: '#00f3ff',     // Cyan
+    bfs: 'rgba(0, 243, 255, 0.2)', // Cyan Glow
+    greedy: 'rgba(255, 0, 85, 0.2)' // Pink Glow
 };
 
 class PriorityQueue {
@@ -564,166 +564,125 @@ function draw() {
                 if (cell.type === 'WALL') {
                     ctx.fillStyle = COLORS.wall;
                     ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+                    // Add subtle border to walls
+                    ctx.strokeStyle = '#3a3a55';
+                    ctx.lineWidth = 1;
+                    ctx.strokeRect(x, y, TILE_SIZE, TILE_SIZE);
                 } else {
                     ctx.fillStyle = COLORS.floor;
                     // BFS Visualization
                     if (showBFS && maze.bfsMap && maze.bfsMap.has(cell)) {
                         let dist = maze.bfsMap.get(cell);
                         let intensity = maze.maxBfsDistance > 0 ? 1 - (dist / maze.maxBfsDistance) : 1;
-                        ctx.fillStyle = `rgba(0, 255, 255, ${intensity * 0.5})`;
+                        ctx.fillStyle = `rgba(0, 243, 255, ${intensity * 0.4})`; // Cyan Glow
                     }
                     ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
 
-                    // Grid lines
-                    ctx.strokeStyle = '#2A2A3A';
+                    // Grid lines (very faint)
+                    ctx.strokeStyle = '#151520';
                     ctx.lineWidth = 1;
                     ctx.strokeRect(x, y, TILE_SIZE, TILE_SIZE);
                 }
 
                 if (cell.type === 'TRAP') {
                     ctx.fillStyle = COLORS.trap;
+                    ctx.shadowColor = COLORS.trap;
+                    ctx.shadowBlur = 10;
                     ctx.beginPath();
                     ctx.arc(x + TILE_SIZE / 2, y + TILE_SIZE / 2, TILE_SIZE / 4, 0, Math.PI * 2);
                     ctx.fill();
+                    ctx.shadowBlur = 0; // Reset
                 } else if (cell.type === 'POWERUP') {
                     ctx.fillStyle = COLORS.powerup;
+                    ctx.shadowColor = COLORS.powerup;
+                    ctx.shadowBlur = 10;
                     ctx.beginPath();
                     ctx.arc(x + TILE_SIZE / 2, y + TILE_SIZE / 2, TILE_SIZE / 4, 0, Math.PI * 2);
                     ctx.fill();
+                    ctx.shadowBlur = 0; // Reset
                 }
             }
         }
 
         // Draw Start/Goal
         if (maze.startNode) {
-            ctx.font = 'bold 20px Arial';
+            ctx.font = 'bold 20px "Orbitron", monospace';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
 
             let sx = maze.startNode.c * TILE_SIZE + TILE_SIZE / 2;
             let sy = maze.startNode.r * TILE_SIZE + TILE_SIZE / 2;
             ctx.fillStyle = COLORS.powerup;
+            ctx.shadowColor = COLORS.powerup;
+            ctx.shadowBlur = 15;
             ctx.fillText('S', sx, sy);
+            ctx.shadowBlur = 0;
         }
 
         if (maze.goalNode) {
             let gx = maze.goalNode.c * TILE_SIZE + TILE_SIZE / 2;
             let gy = maze.goalNode.r * TILE_SIZE + TILE_SIZE / 2;
-            ctx.fillStyle = COLORS.ai; // Purple/Orange for Goal
+            ctx.fillStyle = COLORS.ai; // Pink for Goal
+            ctx.shadowColor = COLORS.ai;
+            ctx.shadowBlur = 15;
             ctx.fillText('G', gx, gy);
+            ctx.shadowBlur = 0;
         }
 
         // Draw Trails
         if (player && player.path.length > 1) {
             ctx.strokeStyle = COLORS.path;
             ctx.lineWidth = 3;
+            ctx.shadowColor = COLORS.path;
+            ctx.shadowBlur = 5;
             ctx.beginPath();
             ctx.moveTo(player.path[0].c * TILE_SIZE + TILE_SIZE / 2, player.path[0].r * TILE_SIZE + TILE_SIZE / 2);
             for (let node of player.path) {
                 ctx.lineTo(node.c * TILE_SIZE + TILE_SIZE / 2, node.r * TILE_SIZE + TILE_SIZE / 2);
             }
             ctx.stroke();
+            ctx.shadowBlur = 0;
         }
 
         if (ai && ai.path.length > 1) {
             ctx.strokeStyle = COLORS.aiPath;
             ctx.lineWidth = 2;
+            ctx.shadowColor = COLORS.aiPath;
+            ctx.shadowBlur = 5;
             ctx.beginPath();
             ctx.moveTo(ai.path[0].c * TILE_SIZE + TILE_SIZE / 2, ai.path[0].r * TILE_SIZE + TILE_SIZE / 2);
             for (let node of ai.path) {
                 ctx.lineTo(node.c * TILE_SIZE + TILE_SIZE / 2, node.r * TILE_SIZE + TILE_SIZE / 2);
             }
             ctx.stroke();
+            ctx.shadowBlur = 0;
         }
 
         // Draw Player
         if (player && player.currentNode) {
             ctx.fillStyle = COLORS.player;
+            ctx.shadowColor = COLORS.player;
+            ctx.shadowBlur = 15;
             ctx.beginPath();
             ctx.arc(player.currentNode.c * TILE_SIZE + TILE_SIZE / 2, player.currentNode.r * TILE_SIZE + TILE_SIZE / 2, TILE_SIZE / 3, 0, Math.PI * 2);
             ctx.fill();
             ctx.strokeStyle = '#FFF';
             ctx.lineWidth = 2;
             ctx.stroke();
+            ctx.shadowBlur = 0;
         }
 
         // Draw AI
         if (ai && ai.currentNode) {
             ctx.fillStyle = COLORS.ai;
+            ctx.shadowColor = COLORS.ai;
+            ctx.shadowBlur = 15;
             ctx.beginPath();
             ctx.arc(ai.currentNode.c * TILE_SIZE + TILE_SIZE / 2, ai.currentNode.r * TILE_SIZE + TILE_SIZE / 2, TILE_SIZE / 3, 0, Math.PI * 2);
             ctx.fill();
+            ctx.shadowBlur = 0;
         }
     } catch (e) {
         console.error("Error in draw:", e);
     }
 }
-
-function gameLoop() {
-    if (gameState === 'PLAYING') {
-        update();
-        draw();
-        requestAnimationFrame(gameLoop);
-    }
-}
-
-function gameOver() {
-    gameState = 'GAMEOVER';
-    document.getElementById('game-over-overlay').classList.remove('hidden');
-
-    let pWin = player.currentNode === maze.goalNode;
-    let aWin = ai.currentNode === maze.goalNode;
-    let result = "";
-    let color = COLORS.text;
-
-    if (pWin && !aWin) { result = "VICTORY!"; color = COLORS.powerup; }
-    else if (aWin && !pWin) { result = "AI WINS!"; color = COLORS.ai; }
-    else {
-        if (player.cost < ai.cost) { result = "YOU WIN! (Lower Cost)"; color = COLORS.powerup; }
-        else if (ai.cost < player.cost) { result = "AI WINS! (Lower Cost)"; color = COLORS.ai; }
-        else {
-            if (player.steps < ai.steps) { result = "YOU WIN! (Fewer Steps)"; color = COLORS.powerup; }
-            else if (ai.steps < player.steps) { result = "AI WINS! (Fewer Steps)"; color = COLORS.ai; }
-            else { result = "DRAW!"; color = COLORS.path; }
-        }
-    }
-
-    document.getElementById('go-result').innerText = result;
-    document.getElementById('go-result').style.color = color;
-
-    document.getElementById('go-p-cost').innerText = player.cost.toFixed(1);
-    document.getElementById('go-ai-cost').innerText = ai.cost.toFixed(1);
-    document.getElementById('go-p-steps').innerText = player.steps;
-    document.getElementById('go-ai-steps').innerText = ai.steps;
-
-    // Algorithm Analysis
-    let huffman = new Huffman();
-    let stats = huffman.getStats(ai.actionLog);
-    let efficiency = ai.cost > 0 ? ((optimalCost / ai.cost) * 100).toFixed(1) : 0;
-
-    document.getElementById('algo-stats').innerHTML = `
-        <p><strong>Algorithm Analysis:</strong></p>
-        <p>BFS Reachability: 100% (Verified)</p>
-        <p>A* Optimal Cost: ${optimalCost.toFixed(1)}</p>
-        <p>Greedy Efficiency: ${efficiency}%</p>
-        <p>Huffman Compression: ${stats.ratio}% (${stats.originalBits}b -> ${stats.compressedBits}b)</p>
-    `;
-}
-
-function showMenu() {
-    gameState = 'MENU';
-    document.getElementById('menu-overlay').classList.remove('hidden');
-    document.getElementById('game-over-overlay').classList.add('hidden');
-    document.getElementById('instructions-overlay').classList.add('hidden');
-}
-
-function showInstructions() {
-    document.getElementById('instructions-overlay').classList.remove('hidden');
-}
-
-function hideInstructions() {
-    document.getElementById('instructions-overlay').classList.add('hidden');
-}
-
-// Start
-init();
