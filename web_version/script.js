@@ -291,41 +291,37 @@ class GreedyAI {
     }
 
     computePath() {
-        let frontier = new PriorityQueue();
-        frontier.put(this.currentNode, 0);
+        // Pure Greedy (Hill Climbing) - No Backtracking
+        this.fullPath = [this.currentNode];
+        let visited = new Set();
+        visited.add(this.currentNode);
 
-        let cameFrom = new Map();
-        cameFrom.set(this.currentNode, null);
+        let curr = this.currentNode;
 
-        let current = null;
+        while (curr !== this.goalNode) {
+            let neighbors = this.maze.getNeighbors(curr);
+            let bestNeighbor = null;
+            let minDist = Infinity;
 
-        while (!frontier.isEmpty()) {
-            current = frontier.get();
-
-            if (current === this.goalNode) break;
-
-            let neighbors = this.maze.getNeighbors(current);
-            for (let { node, cost } of neighbors) {
-                if (!cameFrom.has(node)) {
-                    let priority = this.heuristic(node, this.goalNode);
-                    frontier.put(node, priority);
-                    cameFrom.set(node, current);
+            for (let { node } of neighbors) {
+                if (!visited.has(node)) {
+                    let dist = this.heuristic(node, this.goalNode);
+                    if (dist < minDist) {
+                        minDist = dist;
+                        bestNeighbor = node;
+                    }
                 }
             }
-        }
 
-        if (current === this.goalNode) {
-            let path = [];
-            let curr = this.goalNode;
-            while (curr !== this.currentNode) {
-                path.push(curr);
-                curr = cameFrom.get(curr);
+            if (bestNeighbor) {
+                curr = bestNeighbor;
+                this.fullPath.push(curr);
+                visited.add(curr);
+            } else {
+                console.log("AI stuck! No valid moves (Pure Greedy fault).");
+                this.finished = true;
+                break;
             }
-            path.reverse();
-            this.fullPath = path;
-        } else {
-            console.log("No path found for AI");
-            this.finished = true;
         }
     }
 
