@@ -128,6 +128,11 @@ class Maze {
     }
 
     bfsAnalysis() {
+        if (!this.goalNode) return;
+
+        this.bfsMap = new Map();
+        this.maxBfsDistance = 0;
+
         let queue = [{ node: this.goalNode, dist: 0 }];
         this.bfsMap.set(this.goalNode, 0);
 
