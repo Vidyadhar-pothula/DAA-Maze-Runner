@@ -1,20 +1,20 @@
 const TILE_SIZE = 30;
 const FPS = 60;
 
-// Colors (Neon Cyberpunk Theme)
+// Colors (Midnight Gold Theme)
 const COLORS = {
-    bg: '#050510',       // Void Black
-    wall: '#2a2a40',     // Dark Blue-Grey
-    floor: '#0a0a12',    // Near Black
-    player: '#00ff9d',   // Neon Mint
-    ai: '#ff0055',       // Neon Pink
-    trap: '#ff3300',     // Neon Red
-    powerup: '#ccff00',  // Neon Lime
-    path: '#00ff9d',     // Player Path (Mint)
-    aiPath: '#ff0055',   // AI Path (Pink)
-    text: '#00f3ff',     // Cyan
-    bfs: 'rgba(0, 243, 255, 0.2)', // Cyan Glow
-    greedy: 'rgba(255, 0, 85, 0.2)' // Pink Glow
+    bg: '#0F0F1A',       // Deep Indigo/Black
+    wall: '#4A4036',     // Dark Bronze
+    floor: '#161625',    // Darker Indigo
+    player: '#00E5FF',   // Bright Cyan
+    ai: '#FF2A68',       // Crimson Red
+    trap: '#FF5722',     // Deep Orange
+    powerup: '#FFD700',  // Gold
+    path: '#00E5FF',     // Cyan Path
+    aiPath: '#FF2A68',   // Crimson Path
+    text: '#FFD700',     // Gold Text
+    bfs: 'rgba(0, 229, 255, 0.2)', // Cyan Glow
+    greedy: 'rgba(255, 42, 104, 0.2)' // Red Glow
 };
 
 class PriorityQueue {
@@ -565,7 +565,7 @@ function draw() {
                     ctx.fillStyle = COLORS.wall;
                     ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
                     // Add subtle border to walls
-                    ctx.strokeStyle = '#3a3a55';
+                    ctx.strokeStyle = '#2A2A35';
                     ctx.lineWidth = 1;
                     ctx.strokeRect(x, y, TILE_SIZE, TILE_SIZE);
                 } else {
@@ -574,12 +574,12 @@ function draw() {
                     if (showBFS && maze.bfsMap && maze.bfsMap.has(cell)) {
                         let dist = maze.bfsMap.get(cell);
                         let intensity = maze.maxBfsDistance > 0 ? 1 - (dist / maze.maxBfsDistance) : 1;
-                        ctx.fillStyle = `rgba(0, 243, 255, ${intensity * 0.4})`; // Cyan Glow
+                        ctx.fillStyle = `rgba(0, 229, 255, ${intensity * 0.4})`; // Cyan Glow
                     }
                     ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
 
                     // Grid lines (very faint)
-                    ctx.strokeStyle = '#151520';
+                    ctx.strokeStyle = '#202030';
                     ctx.lineWidth = 1;
                     ctx.strokeRect(x, y, TILE_SIZE, TILE_SIZE);
                 }
@@ -606,7 +606,7 @@ function draw() {
 
         // Draw Start/Goal
         if (maze.startNode) {
-            ctx.font = 'bold 20px "Orbitron", monospace';
+            ctx.font = 'bold 20px "Cinzel", serif';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
 
@@ -686,3 +686,72 @@ function draw() {
         console.error("Error in draw:", e);
     }
 }
+
+function gameLoop() {
+    if (gameState === 'PLAYING') {
+        update();
+        draw();
+        requestAnimationFrame(gameLoop);
+    }
+}
+
+function gameOver() {
+    gameState = 'GAMEOVER';
+    document.getElementById('game-over-overlay').classList.remove('hidden');
+
+    let pWin = player.currentNode === maze.goalNode;
+    let aWin = ai.currentNode === maze.goalNode;
+    let result = "";
+    let color = COLORS.text;
+
+    if (pWin && !aWin) { result = "VICTORY!"; color = COLORS.powerup; }
+    else if (aWin && !pWin) { result = "AI WINS!"; color = COLORS.ai; }
+    else {
+        if (player.cost < ai.cost) { result = "YOU WIN! (Lower Cost)"; color = COLORS.powerup; }
+        else if (ai.cost < player.cost) { result = "AI WINS! (Lower Cost)"; color = COLORS.ai; }
+        else {
+            if (player.steps < ai.steps) { result = "YOU WIN! (Fewer Steps)"; color = COLORS.powerup; }
+            else if (ai.steps < player.steps) { result = "AI WINS! (Fewer Steps)"; color = COLORS.ai; }
+            else { result = "DRAW!"; color = COLORS.path; }
+        }
+    }
+
+    document.getElementById('go-result').innerText = result;
+    document.getElementById('go-result').style.color = color;
+
+    document.getElementById('go-p-cost').innerText = player.cost.toFixed(1);
+    document.getElementById('go-ai-cost').innerText = ai.cost.toFixed(1);
+    document.getElementById('go-p-steps').innerText = player.steps;
+    document.getElementById('go-ai-steps').innerText = ai.steps;
+
+    // Algorithm Analysis
+    let huffman = new Huffman();
+    let stats = huffman.getStats(ai.actionLog);
+    let efficiency = ai.cost > 0 ? ((optimalCost / ai.cost) * 100).toFixed(1) : 0;
+
+    document.getElementById('algo-stats').innerHTML = `
+        <p><strong>Algorithm Analysis:</strong></p>
+        <p>BFS Reachability: 100% (Verified)</p>
+        <p>A* Optimal Cost: ${optimalCost.toFixed(1)}</p>
+        <p>Greedy Efficiency: ${efficiency}%</p>
+        <p>Huffman Compression: ${stats.ratio}% (${stats.originalBits}b -> ${stats.compressedBits}b)</p>
+    `;
+}
+
+function showMenu() {
+    gameState = 'MENU';
+    document.getElementById('menu-overlay').classList.remove('hidden');
+    document.getElementById('game-over-overlay').classList.add('hidden');
+    document.getElementById('instructions-overlay').classList.add('hidden');
+}
+
+function showInstructions() {
+    document.getElementById('instructions-overlay').classList.remove('hidden');
+}
+
+function hideInstructions() {
+    document.getElementById('instructions-overlay').classList.add('hidden');
+}
+
+// Start
+init();
