@@ -10,32 +10,35 @@
 
 <body>
     <div id="game-container">
+        <!-- HUD -->
         <div id="hud">
             <div id="hud-left">LEVEL: <span id="level-display">MEDIUM</span></div>
             <div id="hud-center">DUEL OF LABYRINTH</div>
             <div id="hud-right">TIME: <span id="time-display">0.0</span>s</div>
         </div>
 
+        <!-- Canvas -->
         <canvas id="game-canvas"></canvas>
 
+        <!-- Metrics Panel -->
         <div id="metrics-panel">
             <h3>METRICS</h3>
             <div class="metric-group">
                 <h4>PLAYER</h4>
                 <p>Steps: <span id="p-steps">0</span></p>
-                <p>Cost: <span id="p-cost">0</span></p>
+                <p>Cost: <span id="p-cost">0.0</span></p>
             </div>
             <div class="metric-group">
                 <h4>AI (Greedy BFS)</h4>
                 <p>Steps: <span id="ai-steps">0</span></p>
-                <p>Cost: <span id="ai-cost">0</span></p>
-                <p>Explored: <span id="ai-explored">0</span></p>
+                <p>Cost: <span id="ai-cost">0.0</span></p>
             </div>
             <div id="controls-hint">
-                ESC: Menu | R: Restart | G: Graph
+                ESC: Menu | R: Restart | B: Toggle BFS
             </div>
         </div>
 
+        <!-- Menu Overlay -->
         <div id="menu-overlay" class="overlay">
             <h1>DUEL OF LABYRINTH</h1>
             <h2>Greedy Best-First Search</h2>
@@ -47,6 +50,7 @@
             </div>
         </div>
 
+        <!-- Instructions Overlay -->
         <div id="instructions-overlay" class="overlay hidden">
             <h2>INSTRUCTIONS</h2>
             <div class="scroll-content">
@@ -59,6 +63,7 @@
                 <p><strong>WASD / Arrows</strong> : Move</p>
                 <p><strong>Q, E, Z, C</strong> : Diagonals</p>
                 <p><strong>R</strong> : Restart Level</p>
+                <p><strong>B</strong> : Toggle BFS Visualization</p>
                 <p><strong>ESC</strong> : Return to Menu</p>
 
                 <h3>LEGEND</h3>
@@ -68,6 +73,7 @@
             <button onclick="hideInstructions()">BACK</button>
         </div>
 
+        <!-- Game Over Overlay -->
         <div id="game-over-overlay" class="overlay hidden">
             <h1 id="go-title">GAME OVER</h1>
             <h2 id="go-result">VICTORY!</h2>
@@ -81,11 +87,9 @@
             <button onclick="showMenu()">MENU</button>
         </div>
 
-        <button id="toggle-bfs-btn" onclick="toggleBFS()"
-            style="position: absolute; bottom: 20px; right: 20px; padding: 10px; font-size: 12px; opacity: 0.7;">Toggle
-            BFS Map (B)</button>
-
-        <div id="blackout-overlay" class="overlay hidden" style="background-color: #000; z-index: 200;"></div>
+        <!-- Blackout Transition Overlay -->
+        <div id="blackout-overlay" class="overlay hidden"
+            style="background-color: #1E1E2E; z-index: 200; transition: opacity 0.5s;"></div>
     </div>
     <script src="script.js"></script>
 </body>

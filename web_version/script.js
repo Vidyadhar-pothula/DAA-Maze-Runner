@@ -1,20 +1,20 @@
 const TILE_SIZE = 30;
-const COLS = 21;
-const ROWS = 21;
 const FPS = 60;
 
-// Colors
+// Colors (Modern Dark Theme)
 const COLORS = {
-    bg: '#1E1E2E',
-    wall: '#41415A',
-    floor: '#14141E',
-    player: '#89B4FA',
-    ai: '#FAB387',
-    trap: '#F38BA8',
-    powerup: '#A6E3A1',
-    path: '#89B4FA',
-    aiPath: '#FAB387',
-    text: '#CDD6F4'
+    bg: '#1E1E2E',       // Deep Blue-Grey
+    wall: '#41415A',     // Lighter for Walls
+    floor: '#14141E',    // Darker floor
+    player: '#89B4FA',   // Soft Blue
+    ai: '#FAB387',       // Soft Orange
+    trap: '#F38BA8',     // Soft Red
+    powerup: '#A6E3A1',  // Mint Green
+    path: '#89B4FA',     // Player Path
+    aiPath: '#FAB387',   // AI Path
+    text: '#CDD6F4',     // Off-white
+    bfs: 'rgba(0, 255, 255, 0.3)', // Cyan for BFS
+    greedy: 'rgba(255, 0, 255, 0.3)' // Magenta for Greedy
 };
 
 class PriorityQueue {
@@ -27,6 +27,17 @@ class PriorityQueue {
     get() { return this.elements.shift().item; }
 }
 
+class Node {
+    constructor(r, c, type = 'FLOOR', cost = 1) {
+        this.r = r;
+        this.c = c;
+        this.type = type; // 'FLOOR', 'WALL', 'TRAP', 'POWERUP'
+        this.cost = cost;
+        this.visitedByPlayer = false;
+        this.visitedByAI = false;
+    }
+}
+
 class Maze {
     constructor(cols, rows) {
         this.cols = cols;
@@ -34,6 +45,8 @@ class Maze {
         this.grid = [];
         this.startNode = null;
         this.goalNode = null;
+        this.bfsMap = new Map();
+        this.maxBfsDistance = 0;
         this.generate();
     }
 
@@ -42,7 +55,7 @@ class Maze {
         for (let r = 0; r < this.rows; r++) {
             let row = [];
             for (let c = 0; c < this.cols; c++) {
-                row.push({ r, c, type: 'WALL', visited: false });
+                row.push(new Node(r, c, 'WALL', Infinity));
             }
             this.grid.push(row);
         }
@@ -51,12 +64,27 @@ class Maze {
         let stack = [];
         let start = this.grid[1][1];
         start.type = 'FLOOR';
-        start.visited = true;
+        start.cost = 1;
+        let visited = new Set();
+        visited.add(start);
         stack.push(start);
 
         while (stack.length > 0) {
             let current = stack[stack.length - 1];
-            let neighbors = this.getUnvisitedNeighbors(current, 2);
+            let neighbors = [];
+
+            // Check 2 steps away
+            let dirs = [[0, -2], [0, 2], [-2, 0], [2, 0]];
+            for (let d of dirs) {
+                let nr = current.r + d[0];
+                let nc = current.c + d[1];
+                if (nr > 0 && nr < this.rows - 1 && nc > 0 && nc < this.cols - 1) {
+                    let neighbor = this.grid[nr][nc];
+                    if (!visited.has(neighbor)) {
+                        neighbors.push(neighbor);
+                    }
+                }
+            }
 
             if (neighbors.length > 0) {
                 let next = neighbors[Math.floor(Math.random() * neighbors.length)];
@@ -64,9 +92,11 @@ class Maze {
                 let wallR = (current.r + next.r) / 2;
                 let wallC = (current.c + next.c) / 2;
                 this.grid[wallR][wallC].type = 'FLOOR';
+                this.grid[wallR][wallC].cost = 1;
 
                 next.type = 'FLOOR';
-                next.visited = true;
+                next.cost = 1;
+                visited.add(next);
                 stack.push(next);
             } else {
                 stack.pop();
@@ -77,33 +107,43 @@ class Maze {
         this.startNode = this.grid[1][1];
         this.goalNode = this.grid[this.rows - 2][this.cols - 2];
 
+        // Add Loops (Connectivity)
+        for (let r = 1; r < this.rows - 1; r++) {
+            for (let c = 1; c < this.cols - 1; c++) {
+                if (this.grid[r][c].type === 'WALL' && Math.random() < 0.1) {
+                    let openNeighbors = 0;
+                    let dirs = [[0, -1], [0, 1], [-1, 0], [1, 0]];
+                    for (let d of dirs) {
+                        let nr = r + d[0], nc = c + d[1];
+                        if (this.grid[nr][nc].type !== 'WALL') openNeighbors++;
+                    }
+                    if (openNeighbors >= 2) {
+                        this.grid[r][c].type = 'FLOOR';
+                        this.grid[r][c].cost = 1;
+                    }
+                }
+            }
+        }
+
         // Add Traps and Powerups
         for (let r = 1; r < this.rows - 1; r++) {
             for (let c = 1; c < this.cols - 1; c++) {
-                if (this.grid[r][c].type === 'FLOOR' && Math.random() < 0.1) {
-                    if (Math.random() < 0.6) this.grid[r][c].type = 'TRAP';
-                    else this.grid[r][c].type = 'POWERUP';
+                let node = this.grid[r][c];
+                if (node.type === 'FLOOR' && node !== this.startNode && node !== this.goalNode) {
+                    if (Math.random() < 0.05) {
+                        node.type = 'TRAP';
+                        node.cost = 3;
+                    } else if (Math.random() < 0.03) { // Lower chance for powerup
+                        node.type = 'POWERUP';
+                        node.cost = -2;
+                    }
                 }
             }
         }
-        // Clear Start/Goal
-        this.startNode.type = 'FLOOR';
-        this.goalNode.type = 'FLOOR';
-    }
 
-    getUnvisitedNeighbors(node, step) {
-        let neighbors = [];
-        let dirs = [[0, -step], [0, step], [-step, 0], [step, 0]];
-        for (let d of dirs) {
-            let nr = node.r + d[0];
-            let nc = node.c + d[1];
-            if (nr > 0 && nr < this.rows - 1 && nc > 0 && nc < this.cols - 1) {
-                if (!this.grid[nr][nc].visited) {
-                    neighbors.push(this.grid[nr][nc]);
-                }
-            }
-        }
-        return neighbors;
+        // Ensure Start/Goal are clear
+        this.startNode.type = 'FLOOR'; this.startNode.cost = 1;
+        this.goalNode.type = 'FLOOR'; this.goalNode.cost = 1;
     }
 
     getNeighbors(node) {
@@ -113,14 +153,17 @@ class Maze {
             let nr = node.r + d[0];
             let nc = node.c + d[1];
             if (nr >= 0 && nr < this.rows && nc >= 0 && nc < this.cols) {
-                if (this.grid[nr][nc].type !== 'WALL') {
-                    let cost = 1; // Base cost
+                let neighbor = this.grid[nr][nc];
+                if (neighbor.type !== 'WALL') {
+                    let cost = 1;
                     if (Math.abs(d[0]) + Math.abs(d[1]) === 2) cost = 1.414;
 
-                    let type = this.grid[nr][nc].type;
-                    let penalty = type === 'TRAP' ? 3 : type === 'POWERUP' ? -2 : 0;
+                    // Add penalty/bonus
+                    let penalty = 0;
+                    if (neighbor.type === 'TRAP') penalty = 3;
+                    else if (neighbor.type === 'POWERUP') penalty = -2;
 
-                    neighbors.push({ node: this.grid[nr][nc], cost: cost + penalty });
+                    neighbors.push({ node: neighbor, cost: cost + penalty });
                 }
             }
         }
@@ -137,7 +180,7 @@ class Maze {
         this.bfsMap.set(this.goalNode, 0);
 
         while (queue.length > 0) {
-            let { node, dist } = queue.shift();
+            let { node, dist } = queue.shift(); // Standard queue for BFS
             this.maxBfsDistance = Math.max(this.maxBfsDistance, dist);
 
             let neighbors = this.getNeighbors(node);
@@ -148,6 +191,11 @@ class Maze {
                 }
             }
         }
+    }
+
+    heuristic(a, b) {
+        // Euclidean distance
+        return Math.sqrt(Math.pow(a.r - b.r, 2) + Math.pow(a.c - b.c, 2));
     }
 
     aStarOptimal() {
@@ -166,7 +214,7 @@ class Maze {
             let neighbors = this.getNeighbors(current);
             for (let { node, cost } of neighbors) {
                 // IMPORTANT: Ensure non-negative weights for A* stability
-                let actualMoveCost = Math.max(0, cost);
+                let actualMoveCost = Math.max(0.1, cost);
                 let newCost = costSoFar.get(current) + actualMoveCost;
 
                 if (!costSoFar.has(node) || newCost < costSoFar.get(node)) {
@@ -178,10 +226,6 @@ class Maze {
         }
         return costSoFar.get(this.goalNode) || 0;
     }
-
-    heuristic(a, b) {
-        return Math.sqrt(Math.pow(a.r - b.r, 2) + Math.pow(a.c - b.c, 2));
-    }
 }
 
 class Player {
@@ -191,6 +235,7 @@ class Player {
         this.steps = 0;
         this.cost = 0;
         this.finished = false;
+        this.consumedItems = new Set();
     }
 
     move(dr, dc, maze) {
@@ -206,8 +251,19 @@ class Player {
                 this.steps++;
 
                 let moveCost = (Math.abs(dr) + Math.abs(dc) === 2) ? 1.414 : 1;
-                let penalty = nextNode.type === 'TRAP' ? 3 : nextNode.type === 'POWERUP' ? -2 : 0;
-                this.cost += moveCost + penalty;
+                let penalty = 0;
+
+                // Check items
+                let itemKey = `${nr},${nc}`;
+                if (nextNode.type === 'TRAP' && !this.consumedItems.has(itemKey)) {
+                    penalty = 3;
+                    this.consumedItems.add(itemKey);
+                } else if (nextNode.type === 'POWERUP' && !this.consumedItems.has(itemKey)) {
+                    penalty = -2;
+                    this.consumedItems.add(itemKey);
+                }
+
+                this.cost = Math.max(0, this.cost + moveCost + penalty);
 
                 if (nextNode === maze.goalNode) this.finished = true;
             }
@@ -220,19 +276,17 @@ class GreedyAI {
         this.currentNode = startNode;
         this.goalNode = goalNode;
         this.maze = maze;
-        this.path = [startNode]; // Visited nodes in order (for visualization)
-        this.fullPath = []; // The pre-calculated optimal path
+        this.path = [startNode];
+        this.fullPath = [];
         this.pathIndex = 0;
         this.steps = 0;
         this.cost = 0;
         this.finished = false;
         this.actionLog = "";
-
         this.computePath();
     }
 
     heuristic(a, b) {
-        // Euclidean distance
         return Math.sqrt(Math.pow(a.r - b.r, 2) + Math.pow(a.c - b.c, 2));
     }
 
@@ -260,7 +314,6 @@ class GreedyAI {
             }
         }
 
-        // Reconstruct path
         if (current === this.goalNode) {
             let path = [];
             let curr = this.goalNode;
@@ -268,11 +321,11 @@ class GreedyAI {
                 path.push(curr);
                 curr = cameFrom.get(curr);
             }
-            // path.push(this.currentNode); // Start node is already current
             path.reverse();
             this.fullPath = path;
         } else {
             console.log("No path found for AI");
+            this.finished = true;
         }
     }
 
@@ -287,7 +340,10 @@ class GreedyAI {
             if (Math.abs(this.currentNode.r - nextNode.r) + Math.abs(this.currentNode.c - nextNode.c) === 2) {
                 moveCost = 1.414;
             }
-            let penalty = nextNode.type === 'TRAP' ? 3 : nextNode.type === 'POWERUP' ? -2 : 0;
+
+            let penalty = 0;
+            if (nextNode.type === 'TRAP') penalty = 3;
+            else if (nextNode.type === 'POWERUP') penalty = -2;
 
             // Log Action
             if (penalty === 3) this.actionLog += "T";
@@ -297,14 +353,17 @@ class GreedyAI {
             this.currentNode = nextNode;
             this.path.push(nextNode);
             this.steps++;
-            this.cost += moveCost + penalty;
+            this.cost = Math.max(0, this.cost + moveCost + penalty);
             this.pathIndex++;
 
             if (this.currentNode === this.goalNode) this.finished = true;
+        } else {
+            this.finished = true;
         }
     }
 }
 
+// Huffman for Analysis
 class HuffmanNode {
     constructor(char, freq, left = null, right = null) {
         this.char = char;
@@ -315,67 +374,46 @@ class HuffmanNode {
 }
 
 class Huffman {
-    constructor() {
-        this.codes = {};
-    }
-
+    constructor() { this.codes = {}; }
     buildTree(text) {
-        if (!text || text.length === 0) return null;
-
-        const freqs = {};
-        for (let char of text) {
-            freqs[char] = (freqs[char] || 0) + 1;
-        }
-
-        const pq = new PriorityQueue();
-        for (let char in freqs) {
-            pq.put(new HuffmanNode(char, freqs[char]), freqs[char]);
-        }
-
+        if (!text) return null;
+        let freqs = {};
+        for (let char of text) freqs[char] = (freqs[char] || 0) + 1;
+        let pq = new PriorityQueue();
+        for (let char in freqs) pq.put(new HuffmanNode(char, freqs[char]), freqs[char]);
         while (pq.elements.length > 1) {
             let left = pq.get();
             let right = pq.get();
             let parent = new HuffmanNode(null, left.freq + right.freq, left, right);
             pq.put(parent, parent.freq);
         }
-
         let root = pq.get();
         this.generateCodes(root, "");
         return root;
     }
-
     generateCodes(node, code) {
         if (!node) return;
-        if (!node.left && !node.right) {
-            this.codes[node.char] = code;
-            return;
-        }
+        if (!node.left && !node.right) { this.codes[node.char] = code; return; }
         this.generateCodes(node.left, code + "0");
         this.generateCodes(node.right, code + "1");
     }
-
-    encode(text) {
-        this.codes = {};
-        this.buildTree(text);
-        return text.split('').map(c => this.codes[c]).join('');
-    }
-
     getStats(text) {
         if (!text) return { originalBits: 0, compressedBits: 0, ratio: 0 };
-        let encoded = this.encode(text);
+        this.codes = {};
+        this.buildTree(text);
+        let encoded = text.split('').map(c => this.codes[c]).join('');
         let originalBits = text.length * 8;
         let compressedBits = encoded.length;
-        let ratio = originalBits > 0 ? ((1 - compressedBits / originalBits) * 100) : 0;
-        return { originalBits, compressedBits, ratio: ratio.toFixed(1) };
+        let ratio = originalBits > 0 ? ((1 - compressedBits / originalBits) * 100).toFixed(1) : 0;
+        return { originalBits, compressedBits, ratio };
     }
 }
 
-// Game State
+// Game Global State
 let canvas, ctx;
 let maze, player, ai;
 let gameState = 'MENU'; // MENU, PLAYING, GAMEOVER
 let startTime;
-let animationId;
 let level = 'MEDIUM';
 let showBFS = false;
 let optimalCost = 0;
@@ -383,59 +421,65 @@ let optimalCost = 0;
 function init() {
     canvas = document.getElementById('game-canvas');
     ctx = canvas.getContext('2d');
-    canvas.width = COLS * TILE_SIZE;
-    canvas.height = ROWS * TILE_SIZE;
 
     // Input Handling
     window.addEventListener('keydown', handleInput);
+
+    // Initial Resize
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+}
+
+function resizeCanvas() {
+    // Keep canvas size fixed for game logic, but scale via CSS
+    // Logic size set in startGame
 }
 
 function startGame(lvl) {
-    // 1. Show Blackout
-    let blackout = document.getElementById('blackout-overlay');
-    blackout.classList.remove('hidden');
-    blackout.style.opacity = '1';
+    try {
+        level = lvl;
+        let size = lvl === 'EASY' ? 15 : lvl === 'MEDIUM' ? 21 : 31;
 
-    // 2. Hide Menu immediately
-    document.getElementById('menu-overlay').classList.add('hidden');
+        // Set Canvas Size
+        canvas.width = size * TILE_SIZE;
+        canvas.height = size * TILE_SIZE;
 
-    // 3. Wait 1 second
-    setTimeout(() => {
-        try {
-            level = lvl;
-            let size = lvl === 'EASY' ? 15 : lvl === 'MEDIUM' ? 21 : 31;
-            maze = new Maze(size, size);
-            canvas.width = size * TILE_SIZE;
-            canvas.height = size * TILE_SIZE;
+        // UI Updates
+        document.getElementById('menu-overlay').classList.add('hidden');
+        document.getElementById('blackout-overlay').classList.remove('hidden');
+        document.getElementById('blackout-overlay').style.opacity = '1';
 
-            // Run Structural Analysis (BFS)
-            maze.bfsAnalysis();
+        setTimeout(() => {
+            try {
+                maze = new Maze(size, size);
+                maze.bfsAnalysis();
+                optimalCost = maze.aStarOptimal();
 
-            // Run Optimal Reference (A*)
-            optimalCost = maze.aStarOptimal();
+                player = new Player(maze.startNode);
+                ai = new GreedyAI(maze.startNode, maze.goalNode, maze);
 
-            player = new Player(maze.startNode);
-            ai = new GreedyAI(maze.startNode, maze.goalNode, maze);
+                gameState = 'PLAYING';
+                startTime = Date.now();
 
-            gameState = 'PLAYING';
-            startTime = Date.now();
+                document.getElementById('game-over-overlay').classList.add('hidden');
+                document.getElementById('level-display').innerText = lvl;
 
-            document.getElementById('game-over-overlay').classList.add('hidden');
-            document.getElementById('level-display').innerText = lvl;
+                // Fade out blackout
+                let blackout = document.getElementById('blackout-overlay');
+                blackout.style.opacity = '0';
+                setTimeout(() => blackout.classList.add('hidden'), 500);
 
-            // 4. Fade out blackout
-            blackout.style.opacity = '0';
-            setTimeout(() => {
-                blackout.classList.add('hidden');
-            }, 500); // Wait for fade out
-
-            gameLoop();
-        } catch (e) {
-            console.error(e);
-            alert("Game Error: " + e.message + "\n" + e.stack);
-            showMenu();
-        }
-    }, 1000);
+                gameLoop();
+            } catch (e) {
+                console.error(e);
+                alert("Error starting game: " + e.message);
+                showMenu();
+            }
+        }, 500); // Short delay for transition
+    } catch (e) {
+        console.error(e);
+        alert("Critical Error: " + e.message);
+    }
 }
 
 function handleInput(e) {
@@ -449,28 +493,27 @@ function handleInput(e) {
         case 's': case 'ArrowDown': player.move(1, 0, maze); break;
         case 'a': case 'ArrowLeft': player.move(0, -1, maze); break;
         case 'd': case 'ArrowRight': player.move(0, 1, maze); break;
-        // Diagonals
         case 'q': player.move(-1, -1, maze); break;
         case 'e': player.move(-1, 1, maze); break;
         case 'z': player.move(1, -1, maze); break;
         case 'c': player.move(1, 1, maze); break;
-
-        case 'b': toggleBFS(); break;
-
+        case 'b': showBFS = !showBFS; break;
         case 'r': startGame(level); break;
         case 'Escape': showMenu(); break;
     }
 }
 
-function toggleBFS() {
-    showBFS = !showBFS;
-}
-
 function update() {
     if (gameState !== 'PLAYING') return;
 
-    // AI Move (throttled)
-    if (Math.floor((Date.now() - startTime) / 100) > ai.steps) {
+    // AI Move (throttled based on level)
+    let speed = level === 'EASY' ? 10 : level === 'MEDIUM' ? 5 : 2; // Frames per move
+    let elapsedSec = (Date.now() - startTime) / 1000;
+
+    // Simple speed control: move every X ms
+    let moveInterval = level === 'EASY' ? 500 : level === 'MEDIUM' ? 300 : 150;
+
+    if (Math.floor((Date.now() - startTime) / moveInterval) > ai.steps) {
         ai.chooseMove(maze);
     }
 
@@ -480,7 +523,7 @@ function update() {
     }
 
     // Update HUD
-    document.getElementById('time-display').innerText = ((Date.now() - startTime) / 1000).toFixed(1);
+    document.getElementById('time-display').innerText = elapsedSec.toFixed(1);
     document.getElementById('p-steps').innerText = player.steps;
     document.getElementById('p-cost').innerText = player.cost.toFixed(1);
     document.getElementById('ai-steps').innerText = ai.steps;
@@ -488,6 +531,7 @@ function update() {
 }
 
 function draw() {
+    // Clear
     ctx.fillStyle = COLORS.bg;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -501,7 +545,7 @@ function draw() {
             if (cell.type === 'WALL') {
                 ctx.fillStyle = COLORS.wall;
                 ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
-            } else if (cell.type === 'FLOOR') {
+            } else {
                 ctx.fillStyle = COLORS.floor;
                 // BFS Visualization
                 if (showBFS && maze.bfsMap && maze.bfsMap.has(cell)) {
@@ -510,7 +554,14 @@ function draw() {
                     ctx.fillStyle = `rgba(0, 255, 255, ${intensity * 0.5})`;
                 }
                 ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
-            } else if (cell.type === 'TRAP') {
+
+                // Grid lines
+                ctx.strokeStyle = '#2A2A3A';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(x, y, TILE_SIZE, TILE_SIZE);
+            }
+
+            if (cell.type === 'TRAP') {
                 ctx.fillStyle = COLORS.trap;
                 ctx.beginPath();
                 ctx.arc(x + TILE_SIZE / 2, y + TILE_SIZE / 2, TILE_SIZE / 4, 0, Math.PI * 2);
@@ -525,17 +576,24 @@ function draw() {
     }
 
     // Draw Start/Goal
-    ctx.font = '20px Arial';
-    ctx.fillStyle = '#FFF';
+    ctx.font = 'bold 20px Arial';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('S', maze.startNode.c * TILE_SIZE + TILE_SIZE / 2, maze.startNode.r * TILE_SIZE + TILE_SIZE / 2);
-    ctx.fillText('G', maze.goalNode.c * TILE_SIZE + TILE_SIZE / 2, maze.goalNode.r * TILE_SIZE + TILE_SIZE / 2);
+
+    let sx = maze.startNode.c * TILE_SIZE + TILE_SIZE / 2;
+    let sy = maze.startNode.r * TILE_SIZE + TILE_SIZE / 2;
+    ctx.fillStyle = COLORS.powerup;
+    ctx.fillText('S', sx, sy);
+
+    let gx = maze.goalNode.c * TILE_SIZE + TILE_SIZE / 2;
+    let gy = maze.goalNode.r * TILE_SIZE + TILE_SIZE / 2;
+    ctx.fillStyle = COLORS.ai; // Purple/Orange for Goal
+    ctx.fillText('G', gx, gy);
 
     // Draw Trails
     if (player.path.length > 1) {
         ctx.strokeStyle = COLORS.path;
-        ctx.lineWidth = 2;
+        ctx.lineWidth = 3;
         ctx.beginPath();
         ctx.moveTo(player.path[0].c * TILE_SIZE + TILE_SIZE / 2, player.path[0].r * TILE_SIZE + TILE_SIZE / 2);
         for (let node of player.path) {
@@ -611,7 +669,7 @@ function gameOver() {
     // Algorithm Analysis
     let huffman = new Huffman();
     let stats = huffman.getStats(ai.actionLog);
-    let efficiency = ((optimalCost / ai.cost) * 100).toFixed(1);
+    let efficiency = ai.cost > 0 ? ((optimalCost / ai.cost) * 100).toFixed(1) : 0;
 
     document.getElementById('algo-stats').innerHTML = `
         <p><strong>Algorithm Analysis:</strong></p>
@@ -638,68 +696,4 @@ function hideInstructions() {
 }
 
 // Start
-class HuffmanNode {
-    constructor(char, freq, left = null, right = null) {
-        this.char = char;
-        this.freq = freq;
-        this.left = left;
-        this.right = right;
-    }
-}
-
-class Huffman {
-    constructor() {
-        this.codes = {};
-    }
-
-    buildTree(text) {
-        if (!text) return null;
-        let freqs = {};
-        for (let char of text) {
-            freqs[char] = (freqs[char] || 0) + 1;
-        }
-
-        let pq = new PriorityQueue();
-        for (let char in freqs) {
-            pq.put(new HuffmanNode(char, freqs[char]), freqs[char]);
-        }
-
-        while (pq.elements.length > 1) {
-            let left = pq.get();
-            let right = pq.get();
-            let parent = new HuffmanNode(null, left.freq + right.freq, left, right);
-            pq.put(parent, parent.freq);
-        }
-
-        let root = pq.get();
-        this.generateCodes(root, "");
-        return root;
-    }
-
-    generateCodes(node, code) {
-        if (!node) return;
-        if (!node.left && !node.right) {
-            this.codes[node.char] = code;
-            return;
-        }
-        this.generateCodes(node.left, code + "0");
-        this.generateCodes(node.right, code + "1");
-    }
-
-    encode(text) {
-        this.codes = {};
-        this.buildTree(text);
-        return text.split('').map(c => this.codes[c]).join('');
-    }
-
-    getStats(text) {
-        if (!text) return { originalBits: 0, compressedBits: 0, ratio: 0 };
-        let encoded = this.encode(text);
-        let originalBits = text.length * 8;
-        let compressedBits = encoded.length;
-        let ratio = ((1 - compressedBits / originalBits) * 100).toFixed(1);
-        return { originalBits, compressedBits, ratio };
-    }
-}
-
 init();

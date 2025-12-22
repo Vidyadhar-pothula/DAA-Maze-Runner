@@ -1,7 +1,9 @@
 :root {
     --bg-primary: #1E1E2E;
     --bg-secondary: #41415A;
+    --card-bg: rgba(45, 45, 65, 0.9);
     --accent-blue: #89B4FA;
+    --accent-purple: #CBA6F7;
     --accent-green: #A6E3A1;
     --accent-red: #F38BA8;
     --accent-orange: #FAB387;
@@ -10,106 +12,126 @@
     --border-color: #585B70;
 }
 
-body {
+* {
     margin: 0;
     padding: 0;
-    background-color: #000;
+    box-sizing: border-box;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+body {
+    background-color: var(--bg-primary);
     color: var(--text-main);
-    font-family: 'Arial', sans-serif;
-    overflow: hidden;
     display: flex;
     justify-content: center;
     align-items: center;
     height: 100vh;
+    overflow: hidden;
 }
 
 #game-container {
     position: relative;
-    width: 1000px;
-    height: 720px;
-    background-color: var(--bg-primary);
-    border: 2px solid var(--border-color);
-    box-shadow: 0 0 50px rgba(0, 0, 0, 0.5);
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
 }
 
+/* HUD */
 #hud {
     position: absolute;
     top: 0;
     left: 0;
     width: 100%;
     height: 60px;
-    background-color: rgba(30, 30, 46, 0.9);
-    border-bottom: 2px solid var(--border-color);
+    background-color: var(--card-bg);
+    border-bottom: 1px solid var(--border-color);
     display: flex;
     justify-content: space-between;
     align-items: center;
     padding: 0 20px;
-    box-sizing: border-box;
+    z-index: 10;
+}
+
+#hud-left,
+#hud-right {
+    font-size: 1.2em;
     font-weight: bold;
-    font-size: 20px;
-    z-index: 5;
+    color: var(--accent-blue);
 }
 
 #hud-center {
+    font-size: 1.5em;
+    font-weight: bold;
     color: var(--text-main);
-    font-size: 24px;
+    letter-spacing: 2px;
 }
 
-#hud-left {
-    color: var(--accent-blue);
+#time-display {
+    color: var(--accent-purple);
 }
 
-#hud-right {
-    color: var(--accent-orange);
-}
-
+/* Canvas */
 #game-canvas {
-    position: absolute;
-    top: 145px;
-    /* 80 + 65 (GRID_OFFSET_Y) */
-    left: 20px;
-    background-color: #14141E;
-    border: 2px solid var(--border-color);
+    background-color: var(--bg-primary);
     box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+    border: 1px solid var(--border-color);
+    max-width: 90vw;
+    max-height: 80vh;
 }
 
+/* Metrics Panel */
 #metrics-panel {
     position: absolute;
+    right: 20px;
     top: 80px;
-    left: 740px;
-    width: 240px;
-    height: 620px;
-    background-color: var(--bg-primary);
-    border: 2px solid var(--border-color);
-    border-radius: 15px;
+    width: 280px;
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
     padding: 20px;
-    box-sizing: border-box;
     display: flex;
     flex-direction: column;
+    gap: 15px;
 }
 
-.metric-group {
-    margin-bottom: 30px;
-    padding: 15px;
-    background-color: rgba(255, 255, 255, 0.05);
-    border-radius: 10px;
+#metrics-panel h3 {
+    color: var(--accent-green);
+    text-align: center;
+    margin-bottom: 10px;
 }
 
 .metric-group h4 {
-    margin: 0 0 10px 0;
     color: var(--accent-blue);
+    margin-bottom: 5px;
+    font-size: 0.9em;
+}
+
+.metric-group:nth-child(3) h4 {
+    color: var(--accent-orange);
 }
 
 .metric-group p {
-    margin: 5px 0;
-    font-size: 16px;
+    font-size: 0.9em;
+    color: var(--text-sub);
+    display: flex;
+    justify-content: space-between;
+}
+
+.metric-group span {
+    color: var(--text-main);
+    font-weight: bold;
 }
 
 #controls-hint {
-    margin-top: auto;
-    font-size: 14px;
+    margin-top: 20px;
+    font-size: 0.8em;
     color: var(--text-sub);
     text-align: center;
+    border-top: 1px solid var(--border-color);
+    padding-top: 10px;
 }
 
 /* Overlays */
@@ -119,53 +141,79 @@ body {
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(30, 30, 46, 0.98);
-    /* Slightly more opaque */
+    background-color: rgba(30, 30, 46, 0.95);
     display: flex;
     flex-direction: column;
     justify-content: center;
     align-items: center;
     z-index: 100;
-    /* Ensure it's on top */
-    text-align: center;
+    transition: opacity 0.3s ease;
 }
 
-.hidden {
-    display: none !important;
+.overlay.hidden {
+    opacity: 0;
+    pointer-events: none;
 }
 
-#blackout-overlay {
-    transition: opacity 0.5s ease-in-out;
-}
-
-h1 {
-    font-size: 64px;
+.overlay h1 {
+    font-size: 3em;
     color: var(--accent-green);
     margin-bottom: 10px;
+    text-shadow: 0 0 10px rgba(166, 227, 161, 0.3);
 }
 
-h2 {
-    font-size: 32px;
-    color: var(--accent-blue);
+.overlay h2 {
+    font-size: 1.5em;
+    color: var(--text-sub);
     margin-bottom: 40px;
 }
 
+.menu-options {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    width: 300px;
+}
+
 button {
-    background: transparent;
-    border: 2px solid var(--accent-blue);
-    color: var(--accent-blue);
-    padding: 15px 40px;
-    font-size: 20px;
-    margin: 10px;
+    padding: 15px;
+    font-size: 1.2em;
+    background-color: var(--bg-secondary);
+    color: var(--text-main);
+    border: 2px solid var(--border-color);
+    border-radius: 12px;
     cursor: pointer;
-    border-radius: 5px;
-    transition: all 0.3s;
-    width: 250px;
+    transition: all 0.2s ease;
 }
 
 button:hover {
-    background-color: var(--accent-blue);
+    background-color: var(--accent-purple);
     color: var(--bg-primary);
+    border-color: var(--accent-purple);
+    transform: translateY(-2px);
+}
+
+/* Instructions */
+#instructions-overlay .scroll-content {
+    max-width: 600px;
+    max-height: 60vh;
+    overflow-y: auto;
+    text-align: left;
+    padding: 20px;
+    background-color: var(--card-bg);
+    border-radius: 12px;
+    margin-bottom: 20px;
+}
+
+#instructions-overlay h3 {
+    color: var(--accent-purple);
+    margin-top: 20px;
+    margin-bottom: 10px;
+}
+
+#instructions-overlay p {
+    margin-bottom: 8px;
+    line-height: 1.5;
 }
 
 .legend-item {
@@ -173,22 +221,45 @@ button:hover {
     width: 12px;
     height: 12px;
     border-radius: 50%;
-    margin-right: 5px;
+    margin-right: 8px;
 }
 
-.red {
+.legend-item.red {
     background-color: var(--accent-red);
 }
 
-.green {
+.legend-item.green {
     background-color: var(--accent-green);
+}
+
+/* Game Over */
+#game-over-overlay h1 {
+    color: var(--accent-red);
+}
+
+#game-over-overlay h2 {
+    color: var(--accent-green);
+    margin-bottom: 20px;
 }
 
 .stats-box {
     background-color: var(--bg-secondary);
-    padding: 30px;
-    border-radius: 20px;
-    border: 2px solid var(--border-color);
-    margin-bottom: 30px;
+    padding: 20px;
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+    min-width: 400px;
     text-align: center;
+}
+
+.stats-box p {
+    margin: 10px 0;
+    font-size: 1.1em;
+}
+
+/* Responsive */
+@media (max-width: 1000px) {
+    #metrics-panel {
+        display: none;
+        /* Hide side panel on small screens */
+    }
 }
