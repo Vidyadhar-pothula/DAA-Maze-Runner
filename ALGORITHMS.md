@@ -104,41 +104,32 @@ def a_star_optimal(self):
     return cost_so_far.get(self.goal_node, 0)
 ```
 
-## 4. Pure Greedy Search (Hill Climbing)
+## 4. Greedy Best-First Search
 **Usage:** AI Agent Logic
 **File:** `game_classes.py`
 
-**Note:** This implementation intentionally **removes backtracking**. The AI picks the best immediate neighbor and moves there. If it hits a dead end, it **gets stuck**. This demonstrates the faults of a purely greedy approach.
-
 ```python
 def compute_path(self):
-    """Pure Greedy (Hill Climbing) - No Backtracking"""
-    self.full_path = [self.current_node]
-    self.visited_nodes.add(self.current_node)
+    frontier = PriorityQueue()
+    frontier.put(self.current_node, 0)
     
-    curr = self.current_node
+    came_from = {}
+    came_from[self.current_node] = None
     
-    while curr != self.goal_node:
-        neighbors = self.maze.get_neighbors(curr)
-        best_neighbor = None
-        min_dist = float('inf')
+    current = None
+    
+    while not frontier.empty():
+        current = frontier.get()
         
-        # Find best immediate neighbor
-        for neighbor in neighbors:
-            if neighbor not in self.visited_nodes:
-                dist = self.heuristic(neighbor)
-                if dist < min_dist:
-                    min_dist = dist
-                    best_neighbor = neighbor
-        
-        if best_neighbor:
-            curr = best_neighbor
-            self.full_path.append(curr)
-            self.visited_nodes.add(curr)
-        else:
-            print("AI stuck! No valid moves (Pure Greedy fault).")
-            self.finished = True
+        if current == self.goal_node:
             break
+        
+        for neighbor in self.maze.get_neighbors(current):
+            if neighbor not in came_from:
+                # Greedy only cares about heuristic (distance to goal)
+                priority = self.heuristic(neighbor)
+                frontier.put(neighbor, priority)
+                came_from[neighbor] = current
 ```
 
 ## 5. Huffman Coding

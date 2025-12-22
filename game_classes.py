@@ -478,40 +478,39 @@ class GreedyAI:
         return math.sqrt((node.r - self.goal_node.r)**2 + (node.c - self.goal_node.c)**2)
 
     def compute_path(self):
-        """Pure Greedy (Hill Climbing) - No Backtracking"""
-        self.full_path = [self.current_node]
+        frontier = PriorityQueue()
+        frontier.put(self.current_node, 0)
+        
+        came_from = {}
+        came_from[self.current_node] = None
         self.visited_nodes.add(self.current_node)
         
-        curr = self.current_node
+        current = None
         
-        while curr != self.goal_node:
-            neighbors = self.maze.get_neighbors(curr)
-            best_neighbor = None
-            min_dist = float('inf')
+        while not frontier.empty():
+            current = frontier.get()
+            self.visited_nodes.add(current) # Track visited
             
-            # Find best immediate neighbor
-            for neighbor in neighbors:
-                if neighbor not in self.visited_nodes:
-                    dist = self.heuristic(neighbor)
-                    if dist < min_dist:
-                        min_dist = dist
-                        best_neighbor = neighbor
-            
-            if best_neighbor:
-                curr = best_neighbor
-                self.full_path.append(curr)
-                self.visited_nodes.add(curr)
-            else:
-                print("AI stuck! No valid moves (Pure Greedy fault).")
-                self.finished = True
+            if current == self.goal_node:
                 break
+            
+            for neighbor in self.maze.get_neighbors(current):
+                if neighbor not in came_from:
+                    priority = self.heuristic(neighbor)
+                    frontier.put(neighbor, priority)
+                    came_from[neighbor] = current
         
-        if curr == self.goal_node:
-            # Path found
-            pass
+        if current == self.goal_node:
+            path = []
+            curr = self.goal_node
+            while curr != self.current_node:
+                path.append(curr)
+                curr = came_from[curr]
+            path.reverse()
+            self.full_path = path
         else:
-            # Stuck
-            self.finished = True
+            print("No path found for AI")
+            self.finished = True # Prevent infinite wait
 
     def choose_move(self, maze):
         if self.finished: return
