@@ -2,7 +2,7 @@
 
 # Duel of Labyrinth
 
-[![Play Online](https://img.shields.io/badge/Play-Online-green?style=for-the-badge&logo=google-chrome)](https://vidyadhar-pothula.github.io/DAA-Maze-Runner/)
+
 
 A maze exploration game where you compete against a Greedy Best-First Search AI.algorithm on graph structures**
 
