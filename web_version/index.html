@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Duel of Labyrinth</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div id="game-container">
+        <!-- HUD -->
+        <div id="hud">
+            <div id="hud-left">LEVEL: <span id="level-display">MEDIUM</span></div>
+            <div id="hud-center">DUEL OF LABYRINTH</div>
+            <div id="hud-right">TIME: <span id="time-display">0.0</span>s</div>
+        </div>
+
+        <!-- Canvas -->
+        <canvas id="game-canvas"></canvas>
+
+        <!-- Metrics Panel -->
+        <div id="metrics-panel">
+            <h3>METRICS</h3>
+            <div class="metric-group">
+                <h4>PLAYER</h4>
+                <p>Steps: <span id="p-steps">0</span></p>
+                <p>Cost: <span id="p-cost">0.0</span></p>
+            </div>
+            <div class="metric-group">
+                <h4>AI (Greedy BFS)</h4>
+                <p>Steps: <span id="ai-steps">0</span></p>
+                <p>Cost: <span id="ai-cost">0.0</span></p>
+            </div>
+            <div id="controls-hint">
+                ESC: Menu | R: Restart | B: Toggle BFS
+            </div>
+        </div>
+
+        <!-- Menu Overlay -->
+        <div id="menu-overlay" class="overlay">
+            <h1>DUEL OF LABYRINTH</h1>
+            <h2>Greedy Best-First Search</h2>
+            <div class="menu-options">
+                <button onclick="startGame('EASY')">EASY</button>
+                <button onclick="startGame('MEDIUM')">MEDIUM</button>
+                <button onclick="startGame('HARD')">HARD</button>
+                <button onclick="showInstructions()">INSTRUCTIONS</button>
+            </div>
+        </div>
+
+        <!-- Instructions Overlay -->
+        <div id="instructions-overlay" class="overlay hidden">
+            <h2>INSTRUCTIONS</h2>
+            <div class="scroll-content">
+                <h3>OBJECTIVE</h3>
+                <p>Navigate to the goal (G) with the lowest possible cost.</p>
+                <p>Compete head-to-head against a Greedy Best-First Search AI.</p>
+                <p>Collect Power-Ups (-2 cost) and avoid Traps (+3 cost).</p>
+
+                <h3>CONTROLS</h3>
+                <p><strong>WASD / Arrows</strong> : Move</p>
+                <p><strong>Q, E, Z, C</strong> : Diagonals</p>
+                <p><strong>R</strong> : Restart Level</p>
+                <p><strong>B</strong> : Toggle BFS Visualization</p>
+                <p><strong>ESC</strong> : Return to Menu</p>
+
+                <h3>LEGEND</h3>
+                <p><span class="legend-item red"></span> Red Circle : Trap (+3)</p>
+                <p><span class="legend-item green"></span> Green Circle : Power-Up (-2)</p>
+            </div>
+            <button onclick="hideInstructions()">BACK</button>
+        </div>
+
+        <!-- Game Over Overlay -->
+        <div id="game-over-overlay" class="overlay hidden">
+            <h1 id="go-title">GAME OVER</h1>
+            <h2 id="go-result">VICTORY!</h2>
+            <div class="stats-box">
+                <p>Your Cost: <span id="go-p-cost">0</span> | AI Cost: <span id="go-ai-cost">0</span></p>
+                <p>Your Steps: <span id="go-p-steps">0</span> | AI Steps: <span id="go-ai-steps">0</span></p>
+            </div>
+            <div id="algo-stats" class="stats-box" style="margin-top: 10px; font-size: 0.9em; text-align: left;">
+                <!-- Stats will be injected here -->
+            </div>
+            <button onclick="showMenu()">MENU</button>
+        </div>
+
+        <!-- Blackout Transition Overlay -->
+        <div id="blackout-overlay" class="overlay hidden"
+            style="background-color: #1E1E2E; z-index: 200; transition: opacity 0.5s;"></div>
+    </div>
+    <script src="script.js"></script>
+</body>
+
+</html>
