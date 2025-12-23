@@ -2,7 +2,7 @@ import pygame
 import sys
 import time
 import math
-from game_classes import Maze, Player, GreedyAI
+from game_classes import Maze, Player, GreedyAI, Huffman
 
 # UI States
 MENU = 0
@@ -10,6 +10,7 @@ PLAYING = 1
 GAME_OVER = 2
 INSTRUCTIONS = 3
 REPLAY = 4
+SIMULATION = 5
 
 # Constants
 TILE_SIZE = 30
@@ -26,6 +27,7 @@ ACCENT_GREEN = (166, 227, 161) # Mint Green
 ACCENT_RED = (243, 139, 168)   # Soft Red
 ACCENT_ORANGE = (250, 179, 135)# Soft Orange
 ACCENT_YELLOW = (249, 226, 175)# Soft Yellow
+ACCENT_CYAN = (137, 220, 235)  # Soft Cyan
 TEXT_MAIN = (205, 214, 244)    # Off-white
 TEXT_SUB = (166, 173, 200)     # Muted text
 BORDER_COLOR = (88, 91, 112)   # Subtle border
@@ -210,7 +212,14 @@ class GameController:
         self.show_graph = False
         self.show_visited = False
         self.show_huffman = False
+        self.show_huffman = False
         self.record_frame()
+
+        # Simulation System
+        self.simulation_agents = []
+        self.sim_names = []
+        self.current_sim_index = 0
+
 
     def record_frame(self):
         # Record current state for replay
@@ -266,6 +275,7 @@ class GameController:
                 rect = pygame.Rect(c * TILE_SIZE, r * TILE_SIZE + GRID_OFFSET_Y, TILE_SIZE, TILE_SIZE)
 
                 # Fog of War Logic
+                visible = True
                 if self.state != REPLAY:
                     if self.player and self.player.current_node:
                         dist = max(abs(node.r - self.player.current_node.r), abs(node.c - self.player.current_node.c))
@@ -502,6 +512,95 @@ class GameController:
             self.draw_text("Press ENTER to Menu", self.large_font, ACCENT_BLUE, (cx, cy + 160))
         
         self.draw_text("Press P to Watch Replay", self.medium_font, TEXT_SUB, (cx, cy + 200))
+        self.draw_text("Press S to Simulate All Algorithms", self.medium_font, ACCENT_ORANGE, (cx, cy + 230))
+
+    def prepare_simulation(self):
+        print("Preparing Simulation Agents...")
+        self.simulation_agents = [
+            GreedyAI(self.maze.start_node, self.maze.goal_node, self.maze, 'euclidean', 'best_first'),
+            GreedyAI(self.maze.start_node, self.maze.goal_node, self.maze, 'manhattan', 'best_first'),
+            GreedyAI(self.maze.start_node, self.maze.goal_node, self.maze, 'chebyshev', 'best_first'),
+            GreedyAI(self.maze.start_node, self.maze.goal_node, self.maze, 'euclidean', 'hill_climbing'),
+            GreedyAI(self.maze.start_node, self.maze.goal_node, self.maze, 'euclidean', 'a_star'),
+            GreedyAI(self.maze.start_node, self.maze.goal_node, self.maze, 'euclidean', 'dijkstra')
+        ]
+        self.sim_names = [
+            "Greedy Best-First (Euclidean)",
+            "Greedy Best-First (Manhattan)",
+            "Greedy Best-First (Chebyshev)",
+            "Pure Greedy (Hill Climbing)",
+            "A* Search (Optimal)",
+            "Dijkstra's Algorithm (Optimal)"
+        ]
+        self.current_sim_index = 0
+        print("Simulation Agents Ready")
+
+    def draw_simulation(self):
+        self.screen.fill(BG_PRIMARY)
+        
+        # Use the current simulation agent as the 'active' AI for visualization
+        current_agent = self.simulation_agents[self.current_sim_index]
+        
+        # Hack: Temporarily swap self.ai to current_agent to reuse draw methods
+        # or just manually draw what we need. Let's manually draw to be safe and explicit.
+        
+        # 1. Draw Grid (Background)
+        for r in range(self.maze.height):
+            for c in range(self.maze.width):
+                node = self.maze.get_node(r, c)
+                if node.type == '#':
+                    pygame.draw.rect(self.screen, BG_SECONDARY, (c*TILE_SIZE, r*TILE_SIZE + GRID_OFFSET_Y, TILE_SIZE, TILE_SIZE))
+                else:
+                    color = (20, 20, 30)
+                    # Show visited for current agent
+                    if node in current_agent.visited_nodes:
+                         color = (40, 40, 60) # Slightly lighter for visited
+                    
+                    pygame.draw.rect(self.screen, color, (c*TILE_SIZE, r*TILE_SIZE + GRID_OFFSET_Y, TILE_SIZE, TILE_SIZE))
+                    pygame.draw.rect(self.screen, (30, 30, 40), (c*TILE_SIZE, r*TILE_SIZE + GRID_OFFSET_Y, TILE_SIZE, TILE_SIZE), 1)
+
+                if node == self.maze.start_node:
+                    self.draw_text("S", self.font, ACCENT_GREEN, (c*TILE_SIZE + TILE_SIZE//2, r*TILE_SIZE + GRID_OFFSET_Y + TILE_SIZE//2), shadow=False)
+                elif node == self.maze.goal_node:
+                    self.draw_text("G", self.font, ACCENT_PURPLE, (c*TILE_SIZE + TILE_SIZE//2, r*TILE_SIZE + GRID_OFFSET_Y + TILE_SIZE//2), shadow=False)
+
+        # 2. Draw Path
+        if len(current_agent.full_path) > 1:
+            points = [(n.c * TILE_SIZE + TILE_SIZE//2, n.r * TILE_SIZE + TILE_SIZE//2 + GRID_OFFSET_Y) for n in current_agent.full_path]
+            pygame.draw.lines(self.screen, ACCENT_ORANGE, False, points, 3)
+
+        # 3. Draw Agent (at end of path or animated? Let's show full path static for now, or animated if we want)
+        # For simulation, showing the FULL PATH immediately is often better for comparison.
+        # But let's show the agent at the goal or end of path.
+        end_node = current_agent.full_path[-1] if current_agent.full_path else current_agent.current_node
+        pygame.draw.circle(self.screen, ACCENT_ORANGE, (end_node.c * TILE_SIZE + TILE_SIZE//2, end_node.r * TILE_SIZE + GRID_OFFSET_Y + TILE_SIZE//2), TILE_SIZE//3)
+
+        # 4. HUD
+        w, h = self.screen.get_size()
+        
+        # Header
+        pygame.draw.rect(self.screen, CARD_BG, (0, 0, w, 80))
+        self.draw_text(f"SIMULATION MODE: {self.sim_names[self.current_sim_index]}", self.heading_font, ACCENT_BLUE, (w//2, 40))
+        
+        # Metrics Panel
+        panel_y = h - 150
+        pygame.draw.rect(self.screen, (0, 0, 0, 200), (0, panel_y, w, 150))
+        
+        stats = [
+            f"Total Cost: {current_agent.solution_cost}",
+            f"Steps: {current_agent.solution_steps}",
+            f"Nodes Explored: {current_agent.metrics.nodes_explored}",
+            f"Nodes Visited: {current_agent.metrics.nodes_visited}",
+            f"Efficiency: {current_agent.get_efficiency_vs_optimal(self.maze.optimal_path_length)*100:.1f}%"
+        ]
+        
+        sx = w // 2
+        sy = panel_y + 30
+        for i, line in enumerate(stats):
+            self.draw_text(line, self.medium_font, TEXT_MAIN, (sx, sy + i * 25), shadow=False)
+
+        # Controls
+        self.draw_text("< PREV (Left)   |   NEXT (Right) >   |   ESC: Menu", self.small_font, TEXT_SUB, (w//2, h - 20))
 
     def draw_replay(self):
         # Debug Logging
@@ -613,9 +712,10 @@ class GameController:
             full_log = self.ai.action_log
             if full_log:
                 huff = Huffman()
-                root = huff.build_tree(full_log)
+                huff = Huffman()
+                # encode() builds the tree internally and populates self.codes
+                encoded = huff.encode(full_log)
                 codes = huff.codes
-                encoded = huff.encode(full_log, codes)
                 
                 original_bits = len(full_log) * 8
                 compressed_bits = len(encoded)
@@ -747,9 +847,13 @@ class GameController:
                         self.show_heuristics = True # Show path lines
                         self.show_graph = True # Show Graph Nodes/Edges
                         self.show_visited = False # Show visited by default for "AI Logic"
+                    elif event.key == pygame.K_s:
+                        self.state = SIMULATION
+                        self.prepare_simulation()
+
 
                 elif self.state == REPLAY and event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_ESCAPE: self.state = MENU
+                    if event.key == pygame.K_ESCAPE: self.state = GAME_OVER
                     elif event.key == pygame.K_RIGHT: self.replay_index = min(len(self.history)-1, self.replay_index + 1)
                     elif event.key == pygame.K_LEFT: self.replay_index = max(0, self.replay_index - 1)
                     elif event.key == pygame.K_SPACE: self.replay_speed = 0 if self.replay_speed > 0 else 0.5
@@ -763,6 +867,14 @@ class GameController:
                     elif event.key == pygame.K_g: self.show_graph = not self.show_graph # Graph Toggle
                     elif event.key == pygame.K_v: self.show_visited = not self.show_visited # Visited Toggle
                     elif event.key == pygame.K_c: self.show_huffman = not self.show_huffman # Huffman Toggle
+
+                elif self.state == SIMULATION and event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_ESCAPE: self.state = GAME_OVER
+                    elif event.key == pygame.K_RIGHT: 
+                        self.current_sim_index = (self.current_sim_index + 1) % len(self.simulation_agents)
+                    elif event.key == pygame.K_LEFT:
+                        self.current_sim_index = (self.current_sim_index - 1) % len(self.simulation_agents)
+
 
                 elif self.state == INSTRUCTIONS and event.type == pygame.KEYDOWN:
                     if event.key in (pygame.K_ESCAPE, pygame.K_BACKSPACE):
@@ -796,6 +908,9 @@ class GameController:
                 self.draw_entities()
                 self.draw_hud()
 
+            elif self.state == SIMULATION:
+                self.draw_simulation()
+
             elif self.state == REPLAY:
                 try:
                     self.draw_replay()
@@ -805,10 +920,8 @@ class GameController:
                              self.replay_index = min(len(self.history)-1, self.replay_index + 1)
                 except Exception as e:
                     print(f"Replay Error: {e}")
-                    with open("error_log.txt", "w") as f:
-                        import traceback
-                        traceback.print_exc(file=f)
-                        f.write(f"\nReplay Error: {e}")
+                    with open("replay_error.txt", "w") as f:
+                        f.write(str(e))
                     self.state = MENU # Exit replay on error
 
             elif self.state == GAME_OVER:

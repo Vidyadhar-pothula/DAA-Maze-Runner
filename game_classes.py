@@ -456,12 +456,17 @@ class Huffman:
 
 class GreedyAI:
     """Greedy Best-First Search AI with enhanced metrics"""
-    def __init__(self, start_node, goal_node, maze):
+    def __init__(self, start_node, goal_node, maze, heuristic_type='euclidean', algorithm_type='best_first'):
         self.current_node = start_node
         self.goal_node = goal_node
         self.maze = maze
+        self.heuristic_type = heuristic_type
+        self.algorithm_type = algorithm_type
+        
         self.total_cost = 0
         self.steps = 0
+        self.solution_cost = 0
+        self.solution_steps = 0
         self.path = [start_node]
         self.finished = False
         self.full_path = []
@@ -474,15 +479,24 @@ class GreedyAI:
         self.compute_path()
         
     def heuristic(self, node):
-        # Euclidean distance
-        return math.sqrt((node.r - self.goal_node.r)**2 + (node.c - self.goal_node.c)**2)
+        return self.maze.heuristic(node, self.heuristic_type)
 
     def compute_path(self):
+        if self.algorithm_type == 'hill_climbing':
+            self.compute_path_hill_climbing()
+        else:
+            self.compute_path_best_first()
+
+    def compute_path_best_first(self):
         frontier = PriorityQueue()
         frontier.put(self.current_node, 0)
         
         came_from = {}
+        cost_so_far = {} # For A* and Dijkstra
+        
         came_from[self.current_node] = None
+        cost_so_far[self.current_node] = 0
+        
         self.visited_nodes.add(self.current_node)
         
         current = None
@@ -490,13 +504,43 @@ class GreedyAI:
         while not frontier.empty():
             current = frontier.get()
             self.visited_nodes.add(current) # Track visited
+            self.metrics.record_visit(current)
             
             if current == self.goal_node:
                 break
             
             for neighbor in self.maze.get_neighbors(current):
-                if neighbor not in came_from:
-                    priority = self.heuristic(neighbor)
+                # Calculate new cost (g_score)
+                # Edge weight logic (1 for normal, 1.414 for diagonal, + penalties)
+                edge_cost = 1
+                if abs(current.r - neighbor.r) + abs(current.c - neighbor.c) == 2:
+                    edge_cost = 1.414
+                
+                # Note: In the game loop, penalties are applied on move. 
+                # For pathfinding, we should consider them if we want "aware" algorithms like A*
+                # But Greedy usually ignores them. 
+                # Let's make A* and Dijkstra aware of costs (Traps/Powerups)
+                penalty = 0
+                if neighbor.type == 'T': penalty = 3
+                elif neighbor.type == 'P': penalty = -2
+                
+                # Prevent negative edges for Dijkstra/A* stability
+                step_cost = max(0.1, edge_cost + penalty)
+                new_cost = cost_so_far[current] + step_cost
+                
+                if neighbor not in cost_so_far or new_cost < cost_so_far[neighbor]:
+                    cost_so_far[neighbor] = new_cost
+                    
+                    # Priority Calculation
+                    priority = 0
+                    if self.algorithm_type == 'dijkstra':
+                        priority = new_cost
+                    elif self.algorithm_type == 'a_star':
+                        priority = new_cost + self.heuristic(neighbor)
+                    else: # Greedy Best-First
+                        priority = self.heuristic(neighbor)
+                    
+                    self.metrics.record_evaluation(neighbor, priority)
                     frontier.put(neighbor, priority)
                     came_from[neighbor] = current
         
@@ -508,9 +552,68 @@ class GreedyAI:
                 curr = came_from[curr]
             path.reverse()
             self.full_path = path
+            self.calculate_path_stats()
         else:
-            print("No path found for AI")
+            print(f"No path found for AI ({self.algorithm_type})")
             self.finished = True # Prevent infinite wait
+
+    def compute_path_hill_climbing(self):
+        """Pure Greedy (Hill Climbing) - No backtracking, can get stuck"""
+        current = self.current_node
+        path = []
+        visited = {current}
+        
+        while current != self.goal_node:
+            self.visited_nodes.add(current)
+            self.metrics.record_visit(current)
+            
+            neighbors = self.maze.get_neighbors(current)
+            best_neighbor = None
+            best_h = float('inf')
+            
+            # Find best unvisited neighbor
+            for neighbor in neighbors:
+                if neighbor not in visited:
+                    h = self.heuristic(neighbor)
+                    self.metrics.record_evaluation(neighbor, h)
+                    if h < best_h:
+                        best_h = h
+                        best_neighbor = neighbor
+            
+            if best_neighbor:
+                path.append(best_neighbor)
+                visited.add(best_neighbor)
+                current = best_neighbor
+            else:
+                # Dead end
+                self.metrics.record_dead_end()
+                print(f"Hill Climbing stuck at {current}")
+                break
+                
+        if current == self.goal_node:
+            self.full_path = path
+            self.calculate_path_stats()
+        else:
+            self.full_path = path # Partial path
+            self.finished = True
+
+    def calculate_path_stats(self):
+        """Pre-calculate cost and steps for the found path"""
+        self.solution_steps = len(self.full_path)
+        self.solution_cost = 0
+        
+        current = self.path[0] # Start node
+        for next_node in self.full_path:
+            move_cost = 1
+            if abs(current.r - next_node.r) + abs(current.c - next_node.c) == 2:
+                move_cost = 1.414
+            
+            penalty = 0
+            if next_node.type == 'T': penalty = 3
+            elif next_node.type == 'P': penalty = -2
+            
+            self.solution_cost += move_cost + penalty
+            current = next_node
 
     def choose_move(self, maze):
         if self.finished: return
