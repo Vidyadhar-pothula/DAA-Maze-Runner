@@ -1,8 +1,8 @@
 Traceback (most recent call last):
-  File "/Users/vidyadhar/Downloads/DAA-Maze-Runner-main/main.py", line 939, in <module>
-    game = GameController()
-  File "/Users/vidyadhar/Downloads/DAA-Maze-Runner-main/main.py", line 933, in run
-    pygame.quit()
+  File "/Users/vidyadhar/Downloads/DAA-Maze-Runner-main/main.py", line 951, in <module>
+    game.run()
+  File "/Users/vidyadhar/Downloads/DAA-Maze-Runner-main/main.py", line 945, in run
+    sys.exit()
 SystemExit
 
 Exception: 

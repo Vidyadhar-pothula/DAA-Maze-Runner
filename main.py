@@ -594,10 +594,21 @@ class GameController:
             f"Efficiency: {current_agent.get_efficiency_vs_optimal(self.maze.optimal_path_length)*100:.1f}%"
         ]
         
+        # Explicit Proof of No Backtracking
         sx = w // 2
         sy = panel_y + 30
+        
+        # Add big red warning
+        self.draw_text("BACKTRACKING: DISABLED", self.heading_font, ACCENT_RED, (sx, sy - 40), shadow=False)
+        
+        # Check if failed
+        if current_agent.full_path and current_agent.full_path[-1] != self.maze.goal_node:
+             self.draw_text("STATUS: FAILED (Stuck at Dead End)", self.heading_font, ACCENT_RED, (sx, sy - 10), shadow=False)
+        else:
+             self.draw_text("STATUS: SUCCESS", self.heading_font, ACCENT_GREEN, (sx, sy - 10), shadow=False)
+
         for i, line in enumerate(stats):
-            self.draw_text(line, self.medium_font, TEXT_MAIN, (sx, sy + i * 25), shadow=False)
+            self.draw_text(line, self.medium_font, TEXT_MAIN, (sx, sy + i * 25 + 20), shadow=False)
 
         # Controls
         self.draw_text("< PREV (Left)   |   NEXT (Right) >   |   ESC: Menu", self.small_font, TEXT_SUB, (w//2, h - 20))

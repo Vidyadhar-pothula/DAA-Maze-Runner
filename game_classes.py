@@ -204,7 +204,8 @@ class Maze:
         # Add loops (increase graph connectivity)
         for r in range(1, height-1):
             for c in range(1, width-1):
-                if self.grid[r][c].type == '#' and random.random() < 0.15:
+                # DRASTICALLY REDUCED LOOP PROBABILITY to ensure dead ends for AI failure demo
+                if self.grid[r][c].type == '#' and random.random() < 0.01:
                     open_neighbors = sum(1 for dr, dc in [(-1,0), (1,0), (0,-1), (0,1)]
                                        if self.grid[r+dr][c+dc].type != '#')
                     if open_neighbors >= 2:
@@ -482,7 +483,14 @@ class GreedyAI:
         return self.maze.heuristic(node, self.heuristic_type)
 
     def compute_path(self):
-        if self.algorithm_type == 'hill_climbing':
+        # Enforce Hill Climbing (No Backtracking) for 'best_first' as well
+        print("\n" + "="*50)
+        print("PROOF OF NO BACKTRACKING: Forcing Hill Climbing Algorithm")
+        print("Backtracking Capability: DISABLED")
+        print("If AI hits a dead end, it will CRASH.")
+        print("="*50 + "\n")
+        
+        if self.algorithm_type == 'hill_climbing' or self.algorithm_type == 'best_first':
             self.compute_path_hill_climbing()
         else:
             self.compute_path_best_first()
@@ -585,17 +593,21 @@ class GreedyAI:
                 visited.add(best_neighbor)
                 current = best_neighbor
             else:
-                # Dead end
+                # Dead end - Algorithm Fails (No Backtracking)
                 self.metrics.record_dead_end()
                 print(f"Hill Climbing stuck at {current}")
                 break
                 
+        # Always set the path found so far, even if incomplete
+        self.full_path = path
+        
+
         if current == self.goal_node:
-            self.full_path = path
             self.calculate_path_stats()
         else:
-            self.full_path = path # Partial path
-            self.finished = True
+            # Do NOT set finished=True here. Let the AI walk the partial path first.
+            # self.finished = True 
+            pass
 
     def calculate_path_stats(self):
         """Pre-calculate cost and steps for the found path"""
@@ -644,7 +656,12 @@ class GreedyAI:
             if self.current_node == self.goal_node:
                 self.finished = True
         else:
-            # End of path but not at goal (should be handled by compute_path check, but safety fallback)
+            # End of path but not at goal
+            print(f"DEBUG: End of path. Finished={self.finished}, Current={self.current_node}, Goal={self.goal_node}")
+            if not self.finished and self.current_node != self.goal_node:
+                 error_msg = f"CRITICAL ERROR: AI stuck at {self.current_node}. Backtracking required to solve this maze!"
+                 print(error_msg)
+                 raise RuntimeError(error_msg)
             self.finished = True
     
     def get_efficiency_vs_optimal(self, optimal_cost):

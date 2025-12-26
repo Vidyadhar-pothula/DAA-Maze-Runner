@@ -134,12 +134,45 @@ def heuristic(self, node, heuristic_type='euclidean'):
     return 0
 ```
 
-## 5. Greedy Best-First Search
+
+## 5. Greedy Best-First Search (GBFS)
 **Usage:** AI Agent Logic (Default)
 **File:** `game_classes.py`
 
 **Where & How:**
-This is the **Main AI Opponent** you play against. It uses a Priority Queue to always expand the node that is *geometrically closest* to the goal (lowest heuristic), ignoring the cost of traps. It supports backtracking if it hits a dead end.
+This is the **Main AI Opponent** you play against. It is designed to be fast and aggressive, prioritizing nodes that appear closest to the goal.
+
+**Core Concept:** "Closer is Better."
+Unlike Dijkstra (which minimizes total distance traveled) or A* (which balances distance traveled + distance to go), GBFS **only** considers the estimated distance to the goal. It uses a **Heuristic Function** to make this estimate.
+
+**The Heuristics (The "Measuring Sticks"):**
+The AI can use different mathematical formulas to estimate "closeness":
+
+1.  **Euclidean Distance (Default)**
+    *   **Formula:** $\sqrt{(x_1 - x_2)^2 + (y_1 - y_2)^2}$
+    *   **Logic:** Measures the straight-line distance ("as the crow flies").
+    *   **Behavior:** The AI tries to move directly towards the goal. It produces smooth, natural-looking paths in open areas.
+    *   **Best For:** Maps where diagonal movement is allowed and costs roughly the same as cardinal movement.
+
+2.  **Manhattan Distance (Taxicab Geometry)**
+    *   **Formula:** $|x_1 - x_2| + |y_1 - y_2|$
+    *   **Logic:** Measures distance as if traveling along a grid of city blocks (only Up/Down/Left/Right).
+    *   **Behavior:** The AI prefers cardinal directions. It might overestimate distances in a game that allows diagonals, making it slightly more conservative.
+    *   **Best For:** Grid-based games where diagonal movement is **not** allowed.
+
+3.  **Chebyshev Distance (Chessboard Distance)**
+    *   **Formula:** $\max(|x_1 - x_2|, |y_1 - y_2|)$
+    *   **Logic:** Measures distance assuming you can move in any direction (including diagonals) for a cost of 1 (like a King in Chess).
+    *   **Behavior:** It treats diagonals as "cheap" shortcuts. It can be very aggressive in cutting corners.
+    *   **Best For:** Grids where diagonal movement costs the same as cardinal movement (Cost = 1).
+
+**Pros:**
+*   **Speed:** Very fast execution. It heads straight for the goal.
+*   **Human-like:** Mimics visual intuition.
+
+**Cons:**
+*   **Not Optimal:** It might take a longer path or step on traps because it ignores the cost of the path traveled so far.
+*   **Obstacles:** Can get stuck in "local optima" (e.g., running into a U-shaped wall).
 
 ```python
 def compute_path_best_first(self):
