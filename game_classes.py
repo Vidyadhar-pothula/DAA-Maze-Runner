@@ -470,6 +470,7 @@ class GreedyAI:
         self.solution_steps = 0
         self.path = [start_node]
         self.finished = False
+        self.failed = False # Track if AI gave up
         self.full_path = []
         self.path_index = 0
         self.action_log = ""
@@ -661,7 +662,8 @@ class GreedyAI:
             if not self.finished and self.current_node != self.goal_node:
                  error_msg = f"CRITICAL ERROR: AI stuck at {self.current_node}. Backtracking required to solve this maze!"
                  print(error_msg)
-                 raise RuntimeError(error_msg)
+                 # raise RuntimeError(error_msg) # DISABLED CRASH
+                 self.failed = True
             self.finished = True
     
     def get_efficiency_vs_optimal(self, optimal_cost):

@@ -476,7 +476,9 @@ class GameController:
         else:
             # Should not happen if game_over is triggered by both finishing
             # But if AI gets stuck and gives up?
-            if self.ai.finished and not a_win:
+            if self.ai.failed:
+                 result, col = "AI FAILED (STUCK)", ACCENT_ORANGE
+            elif self.ai.finished and not a_win:
                  result, col = "VICTORY! (AI Failed)", ACCENT_GREEN
             else:
                  result, col = "NO ONE REACHED GOAL", TEXT_SUB
@@ -910,6 +912,9 @@ class GameController:
                     self.ai.choose_move(self.maze)
                     self.process_move(self.ai)
                     self.record_frame()
+
+                if self.ai.failed:
+                    self.state = GAME_OVER
 
                 if self.player.finished and self.ai.finished:
                     self.state = GAME_OVER

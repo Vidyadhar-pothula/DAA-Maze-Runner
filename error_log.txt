@@ -1,7 +1,7 @@
 Traceback (most recent call last):
-  File "/Users/vidyadhar/Downloads/DAA-Maze-Runner-main/main.py", line 951, in <module>
+  File "/Users/vidyadhar/Downloads/DAA-Maze-Runner-main/main.py", line 956, in <module>
     game.run()
-  File "/Users/vidyadhar/Downloads/DAA-Maze-Runner-main/main.py", line 945, in run
+  File "/Users/vidyadhar/Downloads/DAA-Maze-Runner-main/main.py", line 950, in run
     sys.exit()
 SystemExit
 
